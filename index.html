@@ -125,16 +125,18 @@
   body.mobile .cmdline { text-decoration: underline dotted; text-underline-offset: 3px; }
   body.mobile #off { font-size: 14px; }
   body.mobile #pad.on { display: block; }
+  #fsbtn { display: none; }
+  body.mobile.needfs #fsbtn { display: block; }
   body.mobile.kbd #pad { display: none; } /* the keyboard is open: give the story the room */
-  @media (orientation: landscape) and (max-height: 560px) {
-    body.mobile #screen { display: grid; grid-template-columns: 1fr minmax(220px, 38%); grid-template-rows: auto 1fr; }
-    body.mobile #status { grid-column: 1 / 3; }
-    body.mobile #scroll { grid-column: 1; grid-row: 2; }
-    body.mobile #pad { grid-column: 2; grid-row: 2; overflow-y: auto; padding: 0 0 0 8px; }
-    body.mobile #keys { flex-direction: column; }
-    body.mobile #dpad { width: 100%; }
-    body.mobile .chip { height: 32px; }
-  }
+  /* real landscape only (set in layout()): the open keyboard also makes the page short and wide, and must not trigger this */
+    body.mobile.land #screen { display: grid; grid-template-columns: 1fr minmax(220px, 38%); grid-template-rows: auto 1fr; }
+    body.mobile.land.kbd #screen { grid-template-columns: 1fr; } /* pad is hidden while typing, so don't leave its column empty */
+    body.mobile.land #status { grid-column: 1 / 3; }
+    body.mobile.land #scroll { grid-column: 1; grid-row: 2; }
+    body.mobile.land #pad { grid-column: 2; grid-row: 2; overflow-y: auto; padding: 0 0 0 8px; }
+    body.mobile.land #keys { flex-direction: column; }
+    body.mobile.land #dpad { width: 100%; }
+    body.mobile.land .chip { height: 32px; }
 
   @media (prefers-reduced-motion: reduce) {
     #screen, #roll, #cur, #off > div, #logo.reveal, #crt.on { animation: none !important; }
@@ -199,6 +201,7 @@
     baseH = Math.max(baseH, innerHeight, h);
     stage.style.top = (vv ? vv.offsetTop : 0) + 'px'; stage.style.height = h + 'px';
     document.body.classList.toggle('kbd', h < baseH * 0.8);
+    document.body.classList.toggle('land', innerWidth > baseH && baseH <= 560);
     end();
   }
   function applyMode() {
@@ -366,6 +369,7 @@
       b.setAttribute('aria-label', dir === 'look' ? 'look around' : dir ? 'go ' + dir : 'open the keyboard');
       $('dpad').append(b);
     }
+    if (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen) { const f = chip('FULL', goFs); f.id = 'fsbtn'; f.setAttribute('aria-label', 'go full screen'); $('verbs').append(f); }
     for (const v of VERBS) { const b = chip(v[0], null); b.addEventListener('click', () => verbTap(v, b)); $('verbs').append(b); }
   }
   function updatePad() {
@@ -389,12 +393,18 @@
   addEventListener('keydown', e => { if (!powered) { if (e.key !== 'F11') powerOn(); return; } if (busy) skip = true; if (!mobile) cmd.focus(); });
   $('power').addEventListener('click', () => { if (wasOn) location.reload(); }); // power button restarts once on
 
+  // Chrome drops out of full screen when you leave the page; the FULL button (phone pad) puts it back.
+  function goFs() { const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; try { const p = f && f.call(d); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  function fsState() { document.body.classList.toggle('needfs', powered && !location.search.includes('skip') && !(document.fullscreenElement || document.webkitFullscreenElement)); }
+  document.addEventListener('fullscreenchange', fsState); document.addEventListener('webkitfullscreenchange', fsState);
+
   // Browsers only allow full screen after a click or key press, so the screen starts "off" and powering on does both.
   function powerOn() {
     if (powered) return; powered = true;
     $('off').remove(); $('crt').style.visibility = 'visible'; $('led').classList.remove('dim');
     if (location.search.includes('skip')) skip = true; // ?skip jumps past the boot sequence (and stays windowed)
-    else { const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; try { const p = f && f.call(d); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    else goFs();
+    fsState();
     $('skiphint').textContent = skip ? '' : (mobile ? 'TAP TO SKIP' : 'PRESS ANY KEY TO SKIP');
     setTimeout(() => { if (busy) skip = true; }, 30000); // a stalled boot must always finish
     const intro = start(); boot(intro, chunks());
