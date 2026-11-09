@@ -5,8 +5,10 @@ const DIR = { n: 'n', north: 'n', s: 's', south: 's', e: 'e', east: 'e', w: 'w',
 const DNAME = { n: 'north', s: 'south', e: 'east', w: 'west', ne: 'northeast', nw: 'northwest', se: 'southeast', sw: 'southwest', u: 'up', d: 'down', in: 'in', out: 'out' };
 const ZW = new Set('zombie zombies walker walkers undead horde crowd soldiers driver creature monster'.split(' '));
 const ZOMBIE = { id: 'zombie', name: 'zombie', zombie: true };
-let S, out;
-const say = s => out.push(s);
+let S, out, tags, ctx = '';
+// Routine confirmations recede (shown dim); everything else is plain unless the caller labels it.
+const DIM = /^(.+: )?(Taken|Dropped|Done|Closed|Removed|Opened)\.|^(You can't|You don't|You already|You are carrying too much|You are not wearing|There is nothing here|There are no zombies|I don't know the word|Time passes|It is already|Nobody answers|That won't budge|Which direction|Take what|Drop what|Open what|Read what|Put what|Use what|Talk to whom)/;
+const say = (s, c) => { tags.push(c || ctx || (DIM.test(s) ? 'dim' : '')); return out.push(s); };
 const aw = (k, p) => { if (!S.f['s_' + k]) { S.f['s_' + k] = 1; S.score += p; } };
 const cap = s => s[0].toUpperCase() + s.slice(1);
 const ids = loc => Object.keys(items).filter(i => S.at[i] === loc);
@@ -406,13 +408,13 @@ const ENDINGS = {
 };
 function win(k) {
   aw('end', 20);
-  say(ENDINGS[k]());
+  say(ENDINGS[k](), 'win');
   S.over = 'won';
-  say(`\nYour score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\n\nType RESTART to play again, or RESTORE to load a saved game.`);
+  say(`\nYour score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\n\nType RESTART to play again, or RESTORE to load a saved game.`, 'win');
   return '';
 }
 function die(why) {
-  say(`\n${why}\nYour vision narrows. The world goes quiet. When you wake up, you are hungry, and you cannot remember why that is a problem.\n\n   ****  You have joined the walking dead  ****\n\nYour score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\n\nWould you like to RESTART, RESTORE a saved game, or QUIT?`);
+  say(`\n${why}\nYour vision narrows. The world goes quiet. When you wake up, you are hungry, and you cannot remember why that is a problem.\n\n   ****  You have joined the walking dead  ****\n\nYour score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\n\nWould you like to RESTART, RESTORE a saved game, or QUIT?`, 'danger');
   S.over = 'dead';
 }
 
@@ -425,18 +427,18 @@ function exitTo(dir) { let t = val(rooms[S.room].x[dir]); return t; }
 function neighbours(r) { return Object.values(rooms[r].x).map(val).filter(t => rooms[t]); }
 function describe(full) {
   const r = rooms[S.room];
-  if (r.dark && !lit()) { say('Darkness\nIt is pitch black. You are likely to be bitten by a zombie.'); return; }
-  say(r.name);
+  if (r.dark && !lit()) { say('Darkness\nIt is pitch black. You are likely to be bitten by a zombie.', 'danger'); return; }
+  say(r.name, 'room');
   if (full || S.verbose || !S.visited[S.room]) say(val(r.desc));
   S.visited[S.room] = 1;
   for (const id of ids(S.room)) {
     const it = items[id], moved = S.f['m_' + id];
     if (it.lst === '' && !moved) continue;
-    say((it.always || !moved) && it.lst ? val(it.lst) : `There is ${it.n} here.`);
+    say((it.always || !moved) && it.lst ? val(it.lst) : `There is ${it.n} here.`, 'item');
   }
-  for (const id of ids(S.room)) if (items[id].cont && isOpen(id)) { const c = ids('in:' + id); if (c.length) say(`The ${items[id].n.replace(/^(an?|the|your) /, '')} contains: ${c.map(i => items[i].n).join(', ')}.`); }
+  for (const id of ids(S.room)) if (items[id].cont && isOpen(id)) { const c = ids('in:' + id); if (c.length) say(`The ${items[id].n.replace(/^(an?|the|your) /, '')} contains: ${c.map(i => items[i].n).join(', ')}.`, 'item'); }
   const n = S.z[S.room] || 0;
-  if (n) say(n === 1 ? 'A zombie lurches here, staring at you with milky eyes.' : `${n} zombies shamble here, turning toward you.`);
+  if (n) say(n === 1 ? 'A zombie lurches here, staring at you with milky eyes.' : `${n} zombies shamble here, turning toward you.`, 'danger');
 }
 function go(dir) {
   const r = rooms[S.room];
@@ -444,21 +446,21 @@ function go(dir) {
   if (!t) return say("You can't go that way.");
   if (t.startsWith('END_')) return win(t);
   if (!rooms[t]) return say(t);
-  if ((S.z[t] || 0) >= 3) return say(`A crowd of zombies packs ${rooms[t].name}, shoulder to shoulder. You would never get through. You need some way to draw them off.`);
+  if ((S.z[t] || 0) >= 3) return say(`A crowd of zombies packs ${rooms[t].name}, shoulder to shoulder. You would never get through. You need some way to draw them off.`, 'danger');
   S.room = t; S.zt = 0;
   if (S.f.dog) S.at.biscuit = t;
   describe(false);
 }
 function bite(who) {
   const w = ids('worn').find(i => S.f['a_' + i] > 0);
-  if (w) { S.f['a_' + w]--; return say(`${cap(who)} clamps onto your ${items[w].n.replace(/^an? /, '')} - and the fabric holds. ${S.f['a_' + w] ? 'For now.' : 'It is shredded, though. No more protection.'}`); }
+  if (w) { S.f['a_' + w]--; return say(`${cap(who)} clamps onto your ${items[w].n.replace(/^an? /, '')} - and the fabric holds. ${S.f['a_' + w] ? 'For now.' : 'It is shredded, though. No more protection.'}`, 'danger'); }
   S.hp--;
   if (S.hp <= 0) return die(`${cap(who)} sinks its teeth into your neck.`);
-  say(S.hp === 2 ? `${cap(who)} bites your arm! It burns, and you start to feel feverish.` : `${cap(who)} bites you again! Your vision swims. One more bite will do it.`);
+  say(S.hp === 2 ? `${cap(who)} bites your arm! It burns, and you start to feel feverish.` : `${cap(who)} bites you again! Your vision swims. One more bite will do it.`, 'danger');
 }
 function spawn(room, n) {
   S.z[room] = (S.z[room] || 0) + n;
-  if (S.room === room) { S.zt = 0; say(n > 1 ? 'More zombies stagger in!' : 'A zombie staggers in from out of nowhere!'); }
+  if (S.room === room) { S.zt = 0; say(n > 1 ? 'More zombies stagger in!' : 'A zombie staggers in from out of nowhere!', 'danger'); }
 }
 const EV = [
   [6, () => say(vis('phone') ? '\nYour phone shrieks an alarm tone it has never made before. EMERGENCY ALERT. (Try CHECK PHONE.)' : '\nFar off, from wherever you left it, your phone shrieks an alarm tone it has never made before.'), () => S.f.alert = 1],
@@ -473,9 +475,9 @@ const EV = [
 ];
 function tick() {
   S.moves++;
-  if (charging()) { if (S.bat < 100) { S.bat = Math.min(100, S.bat + 10); if (S.bat === 100) { say('(Your phone is fully charged.)'); aw('charge', 3); } } }
-  else if (S.f.phone_on && S.moves % 2 === 0 && S.bat > 0) { S.bat--; if (S.bat === 0) { S.f.phone_on = 0; say('\nYour phone buzzes sadly and goes black. Battery dead.'); } else if (S.bat === 10) say('\n(Your phone battery is at 10%.)'); else if (S.bat === 20 && !S.f.power) say('\n(Your phone warns: 20% battery. The power is out everywhere - every percent counts now.)'); }
-  for (const e of EV) if (e[0] === S.moves) { e[1](); if (e[2]) e[2](); }
+  if (charging()) { if (S.bat < 100) { S.bat = Math.min(100, S.bat + 10); if (S.bat === 100) { say('(Your phone is fully charged.)', 'phone'); aw('charge', 3); } } }
+  else if (S.f.phone_on && S.moves % 2 === 0 && S.bat > 0) { S.bat--; if (S.bat === 0) { S.f.phone_on = 0; say('\nYour phone buzzes sadly and goes black. Battery dead.', 'phone'); } else if (S.bat === 10) say('\n(Your phone battery is at 10%.)', 'phone'); else if (S.bat === 20 && !S.f.power) say('\n(Your phone warns: 20% battery. The power is out everywhere - every percent counts now.)', 'phone'); }
+  for (const e of EV) if (e[0] === S.moves) { ctx = 'event'; e[1](); ctx = ''; if (e[2]) e[2](); }
   if (S.moves % 9 === 0) {
     const zs = Object.keys(S.z).filter(r => S.z[r] > 2 && r !== 'harbor');
     if (zs.length) {
@@ -484,18 +486,18 @@ function tick() {
       if (opts.length) {
         const to = opts[S.rng % opts.length]; S.rng = (S.rng * 48271) % 2147483647;
         S.z[from]--; S.z[to] = (S.z[to] || 0) + 1;
-        if (to === S.room) { S.zt = 0; say('\nA zombie shuffles in, drawn by the noise you are making.'); }
+        if (to === S.room) { S.zt = 0; say('\nA zombie shuffles in, drawn by the noise you are making.', 'danger'); }
       }
     }
   }
   const sp = S.at.speaker;
   if (S.f.spk && rooms[sp] && S.f.spk_t++ < 15) {
-    for (const x of neighbours(sp)) if (S.z[x] > 0) { S.z[sp] = (S.z[sp] || 0) + S.z[x]; S.z[x] = 0; S.f.lured = 1; aw('lure', 6); say('\nThe zombies in earshot lift their heads as one, and shuffle off toward the thumping music.'); }
-  } else if (S.f.spk && rooms[sp] && S.f.spk_t === 16) { S.f.spk = 0; say('\nThe BoomBlast wheezes out its last note. Silence.'); }
+    for (const x of neighbours(sp)) if (S.z[x] > 0) { S.z[sp] = (S.z[sp] || 0) + S.z[x]; S.z[x] = 0; S.f.lured = 1; aw('lure', 6); say('\nThe zombies in earshot lift their heads as one, and shuffle off toward the thumping music.', 'event'); }
+  } else if (S.f.spk && rooms[sp] && S.f.spk_t === 16) { S.f.spk = 0; say('\nThe BoomBlast wheezes out its last note. Silence.', 'event'); }
   const n = S.z[S.room] || 0, dark = rooms[S.room].dark && !lit();
   if (!S.over && (n || dark)) {
     S.zt++;
-    if (S.zt === 2) say(n ? `\nThe zombie${n > 1 ? 's are' : ' is'} almost on you!` : '\nSomething moves in the dark, very close.');
+    if (S.zt === 2) say(n ? `\nThe zombie${n > 1 ? 's are' : ' is'} almost on you!` : '\nSomething moves in the dark, very close.', 'danger');
     else if (S.zt >= 3) bite(n ? 'a zombie' : 'something in the dark');
   }
 }
@@ -537,7 +539,7 @@ const PH = [[/^pick up (.+)/, 'take $1'], [/^pick (.+) up$/, 'take $1'], [/^put 
   [/^(swipe|scan|tap|insert) (.+)/, 'swipe $2'], [/^(connect|plug) (.+)/, 'plug $2'], [/^go to (.+)/, 'enter $1'], [/^(\d{4})$/, 'code $1'], [/^(g|again)$/, 'again']];
 const PREP = new Set('with using into in on to at from onto toward'.split(' '));
 function run(raw) {
-  out = [];
+  out = []; tags = [];
   const flush = () => out.join('\n');
   let line = raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   if (S.over) {
@@ -564,7 +566,7 @@ function run(raw) {
   if (P.n2) { if (DIR[P.n2]) P.dir = DIR[P.n2]; else { b = find(P.n2); if (!b) return flush(); } }
   const hv = { move: 'push', shove: 'push', drag: 'push', barricade: 'push', show: 'give', hand: 'give', offer: 'give', get: 'take', grab: 'take', check: 'examine' }[verb] || verb;
   const hk = hv === 'give' ? (b && b.on && b.on.give && (x => b.on.give(a))) : a && a.on && a.on[hv];
-  if (hk && !S.over) { const r = hk(b); if (typeof r === 'string') say(r); if (r !== undefined) { if (!v.free && !S.over) tick(); return flush(); } }
+  if (hk && !S.over) { const r = hk(b); if (typeof r === 'string') say(r, ['talk', 'give', 'knock'].includes(hv) ? 'speech' : a && a.id === 'phone' ? 'phone' : ''); if (r !== undefined) { if (!v.free && !S.over) tick(); return flush(); } }
   v.fn(a, b, P);
   if (!v.free && !S.over) tick();
   return flush();
@@ -576,15 +578,15 @@ def('inventory i inv', () => {
   const inv = ids('inv'), worn = ids('worn');
   if (!inv.length && !worn.length) return say('You are empty-handed. (Not even the phone? Bold.)');
   say('You are carrying:');
-  for (const i of inv) { const c = ids('in:' + i); say('  ' + cap(items[i].n) + (items[i].cont && c.length ? ', containing: ' + c.map(x => items[x].n).join(', ') : '')); }
-  for (const i of worn) say('  ' + cap(items[i].n) + ' (being worn)');
+  for (const i of inv) { const c = ids('in:' + i); say('  ' + cap(items[i].n) + (items[i].cont && c.length ? ', containing: ' + c.map(x => items[x].n).join(', ') : ''), 'item'); }
+  for (const i of worn) say('  ' + cap(items[i].n) + ' (being worn)', 'item');
   say(`(${inv.length}/${CARRY} items in hand)`);
 }, 1);
 def('examine x inspect check', (a, b, P) => {
   if (!P.n1) return describe(true);
   if (a.scn) return say(a.scn);
   if (a.zombie) return say('Grey, glassy-eyed, and walking like it has lost something important. It does not blink.');
-  say(val(a.d));
+  say(val(a.d), a.id === 'phone' ? 'phone' : '');
   if (a.cont && isOpen(a.id)) { const c = ids('in:' + a.id); say(c.length ? `It contains: ${c.map(i => items[i].n).join(', ')}.` : 'It is empty.'); }
 });
 def('take get grab steal pickup', (a, b, P, q) => {
@@ -771,13 +773,15 @@ def('hint', () => {
     [() => !S.f.pillsGiven, 'Mrs. Alvarez, on the porch west of Maple Street, is locked in and needs her heart pills from the pharmacy. KNOCK on her door for details.'],
     [() => true, 'Three escapes: Pier 9 (south-east of the square, boat), Bunker Halcyon (north-west, up Mount Kestrel), and Fort Marrow Airfield (north-east, helicopter). Each needs something specific. Pier: your phone pass and a way past the horde (a speaker?). Bunker: ranger key (Mrs. Alvarez), logbook code, keycard, and light. Airfield: bolt cutters and the flare gun in the police evidence room.']
   ];
-  say(H.find(h => h[0]())[1]);
+  say(H.find(h => h[0]())[1], 'hint');
 }, 1);
 
 function describeStart() {
-  say('ZGEN: The Z Stands for Generation and Zombies\nAn Interactive Survival Fiction\nCopyright (c) 2026 Gammolore. All rights reserved.\nZGEN is a work of fiction. Any resemblance to your group chat is purely coincidental.\nRelease 1 / Serial number 261109\n\n(Type HELP if you are new to this.)\n');
+  say('ZGEN: The Z Stands for Generation and Zombies', 'room');
+  say('An Interactive Survival Fiction\nCopyright (c) 2026 Gammolore. All rights reserved.\nZGEN is a work of fiction. Any resemblance to your group chat is purely coincidental.\nRelease 1 / Serial number 261109\n\n(Type HELP if you are new to this.)\n', 'dim');
   describe(true);
 }
 function status() { const r = rooms[S.room]; return { room: r.dark && !lit() ? 'Darkness' : r.name, score: S.score, moves: S.moves, max: MAX }; }
-function start() { init(); out = []; describeStart(); return out.join('\n'); }
-if (typeof module !== 'undefined') module.exports = { start, run, status, context, get S() { return S; } };
+function start() { init(); out = []; tags = []; describeStart(); return out.join('\n'); }
+function chunks() { return out.map((t, i) => [t, tags[i]]); } // the last output, with a style label for each piece
+if (typeof module !== 'undefined') module.exports = { start, run, status, context, chunks, get S() { return S; } };

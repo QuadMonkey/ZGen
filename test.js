@@ -112,3 +112,19 @@ console.log('throw-from-backpack ok');
   delete global.localStorage;
   console.log('phone-support checks ok');
 }
+
+// -- colours: the engine labels each piece of output; the text itself must be unchanged
+{
+  g.start();
+  const labels = () => g.chunks().map(c => c[1]);
+  assert.strictEqual(labels()[0], 'room', 'the title is a room-style line');
+  assert(labels().includes('item'), 'items are labelled');
+  const text = g.run('take phone'); assert.strictEqual(g.chunks().map(c => c[0]).join('\n'), text, 'chunks join back to the exact output');
+  assert(labels().includes('dim'), 'Taken. is dim');
+  g.run('check phone'); assert(labels().includes('phone'), 'phone screen is labelled');
+  g.S.room = 'porch'; g.run('knock door'); assert(labels().includes('speech'), 'NPC talk is speech');
+  g.run('hint'); assert(labels().includes('hint'), 'hints are labelled');
+  g.S.room = 'hospital'; g.S.zt = 0; g.run('look'); assert(labels().includes('danger'), 'zombies are danger');
+  g.S.moves = 11; g.run('wait'); assert(labels().includes('event'), 'timed events are labelled');
+  console.log('colour labels ok');
+}

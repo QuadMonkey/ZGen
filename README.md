@@ -78,6 +78,10 @@ off limits, and the game will tell you when it does not understand.
 | Tools | `pry <x> with <y>`, `cut <x> with <y>`, `unlock <x> with <y>`, `push <x>`, `throw <x> <direction>`, `tape <x>` |
 | Game | `inventory` (or `i`), `score`, `diagnose`, `hint`, `save`, `restore`, `restart`, `quit`, `verbose`, `brief`, `again` (or `g`) |
 
+The text is colour-coded: room names in yellow, things you can pick up in cyan, people speaking in green, your phone in mint, the
+world moving on in pink, danger as white on a red bar, and routine replies such as "Taken." in a quiet blue. Your own commands are
+amber. Type `colour` to switch the colours off (and on again) if you prefer plain text.
+
 `save` stores your game in your browser, so it lasts until you clear your site data. `continue` resumes the autosave.
 
 ## How survival works

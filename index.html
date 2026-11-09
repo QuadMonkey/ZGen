@@ -46,10 +46,12 @@
   /* ---- the 40-column text screen (like the original C64/Amiga ports) ---- */
   #screen { position: relative; width: 640px; height: 440px; background: var(--blue); color: #fff; display: flex; flex-direction: column;
     font: 16px/20px 'PS2P', 'Courier New', monospace; -webkit-font-smoothing: none; font-smooth: never; animation: flick 0.12s steps(2) infinite;
-    text-shadow: 0 0 3px rgba(255,255,255,.55), 1px 0 rgba(255,60,60,.3), -1px 0 rgba(60,200,255,.3); }
+    text-shadow: 0 0 3px currentColor, 1px 0 rgba(255,60,60,.3), -1px 0 rgba(60,200,255,.3); }
   @keyframes flick { 0% { opacity: 1; } 50% { opacity: .965; } }
   #status { display: none; background: #fff; color: var(--blue); padding: 0 0; text-shadow: none; justify-content: space-between; flex: none; line-height: 20px; }
   #status span { white-space: pre; }
+  #status #room { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }  /* a long room name shortens with "..." instead of hiding the score */
+  #status #stats { flex: none; padding-left: 1ch; }
   #scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }
   #scroll::-webkit-scrollbar { display: none; }
   #log, #row { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -62,7 +64,18 @@
   #cur { display: inline-block; width: 1em; height: 1em; background: var(--cursor); vertical-align: -2px; animation: blink 1s steps(1) infinite; text-shadow: none; box-shadow: 0 0 6px var(--cursor); }
   @keyframes blink { 50% { opacity: 0; } }
   #cmd { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; border: 0; padding: 0; margin: 0; background: transparent; color: transparent; caret-color: transparent; }
-  .cmdline { cursor: pointer; }
+  .cmdline { cursor: pointer; color: #ffcc66; }
+  .room { color: #ffff55; }                 /* where you are */
+  .item { color: #55ffff; }                 /* things you can pick up, and what you carry */
+  .speech { color: #77ff99; }               /* people talking */
+  .event { color: #ffb3ff; }                /* the world moving on: sirens, blackouts */
+  .phone { color: #99ffcc; }                /* your phone */
+  .hint { color: #ffcc66; }
+  .win { color: #ffff55; }
+  .dim { color: #b8d4ff; }                  /* routine confirmations recede */
+  .danger { background: #a00000; color: #fff; text-shadow: none; }   /* reverse video, like an old terminal */
+  body.mono .cmdline, body.mono .room, body.mono .item, body.mono .speech, body.mono .event, body.mono .phone, body.mono .hint, body.mono .win, body.mono .dim { color: inherit; }
+  body.mono .danger { background: none; color: inherit; }
 
   /* ---- tap buttons (phones only) ---- */
   #pad { display: none; flex: none; padding-top: 6px; text-shadow: none; }
@@ -104,6 +117,8 @@
   body.mobile #crt { padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); }
   body.mobile #screen { width: 100%; height: 100%; font-size: var(--fs); line-height: calc(var(--fs) * 1.4); animation: none; }
   body.mobile #status { flex-wrap: wrap; line-height: calc(var(--fs) * 1.4); }
+  body.mobile #status #room { overflow: visible; white-space: pre; }
+  body.mobile #status #stats { margin-left: auto; padding-left: 0; }
   body.mobile #roll { display: none; }
   body.mobile #row { min-height: 38px; padding-top: 4px; }
   body.mobile .cmdline { text-decoration: underline dotted; text-underline-offset: 3px; }
@@ -150,7 +165,7 @@
   <div id="foot"></div>
 </div>
 
-<script src="game.js?v=3"></script>
+<script src="game.js?v=4"></script>
 <script>
   const $ = id => document.getElementById(id);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -168,6 +183,7 @@
   // (never when the on-screen keyboard changes the height, or the layout would flip mid-game).
   const isPhone = () => location.search.includes('mobile') || (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 600) || innerWidth < 700; // ?mobile forces phone mode (handy for testing)
   let mobile = isPhone(), lastW = innerWidth, baseH = 0;
+  let mono = false; try { mono = localStorage.getItem('zgen-mono') === '1'; } catch (e) {}
   const SIZES = [12, 16, 10]; let sizeIx = 0;
   try { sizeIx = Math.max(0, SIZES.indexOf(+localStorage.getItem('zgen-fs'))); } catch (e) {}
 
@@ -208,6 +224,20 @@
     for (let i = 0; i < text.length && !skip; i += per) { t.data = text.slice(0, i + per); end(); await (delay ? sleep(delay) : frame()); }
     t.data = text; end();
   }
+  async function typeChunks(chunks, per = mobile ? 18 : 6, delay = 0) {
+    const segs = chunks.map((c, i) => ({ cls: c[1], text: c[0] + (i < chunks.length - 1 ? '\n' : '') }));
+    const nodes = segs.map(g => { const el = document.createElement('span'); if (g.cls) el.className = g.cls; const t = document.createTextNode(''); el.append(t); log.append(el); return t; });
+    let budget = per;
+    for (let k = 0; k < segs.length; k++) {
+      const text = segs[k].text; let pos = 0;
+      while (pos < text.length && !skip) {
+        const n = Math.min(budget, text.length - pos); pos += n; budget -= n; nodes[k].data = text.slice(0, pos); end();
+        if (budget === 0) { await (delay ? sleep(delay) : frame()); budget = per; }
+      }
+      nodes[k].data = text;
+    }
+    end();
+  }
   // the C64 "loading" border: random bands of colour
   const C64 = ['#000', '#fff', '#883932', '#67b6bd', '#8b5429', '#55a049', '#40318d', '#bfce72', '#8b5429', '#9ae29b'];
   async function loadingBorder(ms) {
@@ -215,12 +245,12 @@
     glass.style.background = '';
   }
 
-  async function boot(intro) {
-    try { await bootSequence(intro); }
+  async function boot(intro, introChunks) {
+    try { await bootSequence(intro, introChunks); }
     catch (e) { showError(e.message); log.append('\n' + intro + '\n\n'); }
     finally { $('skiphint').remove(); skip = false; busy = false; row.style.display = 'block'; pad.classList.add('on'); end(); if (!mobile) cmd.focus(); }
   }
-  async function bootSequence(intro) {
+  async function bootSequence(intro, introChunks) {
     $('crt').classList.add('on'); await sleep(750);
     if (!skip) {
       await typeOut('**** GAMMOLORE 64 BASIC V2 ****\n\n64K RAM SYSTEM  38911 BASIC BYTES FREE\n\nREADY.\n', 3, 14);
@@ -239,15 +269,23 @@
     if (!skip) { loadingBorder(1300); await sleep(2600); await wait(600); }
     let resume = false; try { resume = !!localStorage.getItem('zgen-auto'); } catch (e) {}
     const text = intro + (resume ? '\n\n(An autosaved game was found. Type CONTINUE to resume it.)' : '');
-    await typeOut(text + '\n\n'); announce(text); updatePad(); // (on a phone the keyboard waits until you ask for it)
+    await typeChunks([...introChunks, ...(resume ? [['\n(An autosaved game was found. Type CONTINUE to resume it.)', 'dim']] : []), ['\n', '']]); announce(text); updatePad(); // (on a phone the keyboard waits until you ask for it)
   }
 
   async function submit(v) {
     if (busy) { skip = true; return; }
     busy = true; row.classList.add('busy'); closeStrip();
     const l = document.createElement('span'); l.className = 'cmdline'; l.dataset.cmd = v; l.textContent = '> ' + v + '\n'; log.append(l);
-    const out = run(v); refresh();
-    await typeOut(out + '\n\n'); announce(out);
+    const colour = v.trim().toLowerCase().match(/^colou?r(?:\s+(on|off))?$/); // COLOUR switches the text colours on or off
+    if (colour) {
+      mono = colour[1] ? colour[1] === 'off' : !mono; document.body.classList.toggle('mono', mono);
+      try { localStorage.setItem('zgen-mono', mono ? '1' : '0'); } catch (e) {}
+      const msg = mono ? 'Colour is off. Type COLOUR to turn it back on.' : 'Colour is on. Type COLOUR to turn it off.';
+      await typeChunks([[msg, 'dim'], ['\n', '']]); announce(msg);
+    } else {
+      const out = run(v), pieces = chunks(); refresh();
+      await typeChunks([...pieces, ['\n', '']]); announce(out);
+    }
     skip = false; busy = false; row.classList.remove('busy'); end(); autosave();
   }
 
@@ -324,8 +362,9 @@
     else { const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; try { const p = f && f.call(d); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
     $('skiphint').textContent = skip ? '' : (mobile ? 'TAP TO SKIP' : 'PRESS ANY KEY TO SKIP');
     setTimeout(() => { if (busy) skip = true; }, 30000); // a stalled boot must always finish
-    boot(start());
+    const intro = start(); boot(intro, chunks());
   }
+  document.body.classList.toggle('mono', mono);
   applyMode();
 </script>
 </body>
