@@ -1,0 +1,9 @@
+# third-party reference material: not ours to publish
+example images/
+example fonts/
+node_modules/
+nohup.out
+.DS_Store
+
+# full-size original artwork: kept locally, not published
+*-original.*

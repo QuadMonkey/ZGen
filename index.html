@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZGEN - A Gammolore Game</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<style>
+  @font-face { font-family: 'PS2P'; src: url(assets/fonts/PressStart2P.ttf) format('truetype'); }
+  :root { --blue: #0055aa; --border: #0055aa; --cursor: #ff8800; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, #3b352c 0%, #16130f 65%, #070605 100%); }
+
+  /* Everything is drawn at a fixed size, then scaled to fit the window by fit() below. */
+  #stage { position: absolute; left: 50%; top: 50%; width: 900px; height: 770px; margin: -385px 0 0 -450px; }
+
+  /* ---- the monitor: beige case > darker bezel > black frame > curved glass ---- */
+  #case { position: relative; width: 860px; margin: 0 auto; box-sizing: border-box; padding: 34px 30px 0; border-radius: 18px 18px 8px 8px;
+    background: linear-gradient(180deg, #e8e3d4 0%, #d8d2c1 55%, #cbc4b1 100%);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,.6), inset 0 -8px 14px rgba(0,0,0,.18), 0 40px 70px rgba(0,0,0,.7), 0 0 0 1px #8a8372; }
+  #case::before { content: ""; position: absolute; left: 60px; right: 60px; top: 10px; height: 8px; opacity: .5; /* top vent slots */
+    background: repeating-linear-gradient(90deg, #9d9582 0 3px, transparent 3px 9px); border-radius: 4px; }
+  #bezel { width: 800px; box-sizing: border-box; padding: 26px; margin: 0 auto; border-radius: 14px;
+    background: linear-gradient(180deg, #bdb6a3, #aea792);
+    box-shadow: inset 0 0 0 2px #9a927f, inset 4px 6px 16px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.7); }
+  #frame { width: 744px; box-sizing: border-box; padding: 12px; border-radius: 46px / 40px; background: #161616; box-shadow: inset 0 0 14px #000, 0 0 0 2px #7d7766; }
+  #glass { position: relative; width: 720px; height: 540px; border-radius: 34px / 30px; overflow: hidden; background: var(--border); }
+  #crt { position: absolute; inset: 0; padding: 50px 40px; box-sizing: border-box; transform-origin: 50% 50%; }
+  #crt.on { animation: poweron .7s ease-out; }
+  @keyframes poweron { 0% { transform: scale(1, .004); filter: brightness(6); } 55% { transform: scale(1, .004); filter: brightness(6); } 75% { transform: scale(1, 1); filter: brightness(2.2); } 100% { transform: scale(1, 1); filter: brightness(1); } }
+
+  /* CRT glass effects, layered over the screen */
+  .fx { position: absolute; inset: 0; pointer-events: none; }
+  #scan { background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.26) 2px 3px); }
+  #vig { background: radial-gradient(ellipse at center, rgba(0,0,0,0) 52%, rgba(0,0,0,.6) 100%); box-shadow: inset 0 0 60px 10px rgba(0,0,0,.55); }
+  #glare { background: radial-gradient(ellipse 26% 16% at 24% 14%, rgba(255,255,255,.2), rgba(255,255,255,0) 100%), linear-gradient(128deg, rgba(255,255,255,.12) 0%, rgba(255,255,255,0) 32%); }
+  #roll { background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,.05) 50%, rgba(255,255,255,0) 100%); height: 30%; animation: roll 7s linear infinite; }
+  @keyframes roll { from { transform: translateY(-110%); } to { transform: translateY(420%); } }
+
+  /* ---- the 40-column text screen (like the original C64/Amiga ports) ---- */
+  #screen { position: relative; width: 640px; height: 440px; background: var(--blue); color: #fff; display: flex; flex-direction: column;
+    font: 16px/20px 'PS2P', 'Courier New', monospace; -webkit-font-smoothing: none; font-smooth: never; animation: flick 0.12s steps(2) infinite;
+    text-shadow: 0 0 3px rgba(255,255,255,.55), 1px 0 rgba(255,60,60,.3), -1px 0 rgba(60,200,255,.3); }
+  @keyframes flick { 0% { opacity: 1; } 50% { opacity: .965; } }
+  #status { display: none; background: #fff; color: var(--blue); padding: 0 0; text-shadow: none; justify-content: space-between; flex: none; line-height: 20px; }
+  #status span { white-space: pre; }
+  #scroll { flex: 1; overflow-y: auto; scrollbar-width: none; }
+  #scroll::-webkit-scrollbar { display: none; }
+  #log, #row { white-space: pre-wrap; overflow-wrap: anywhere; }
+  #logo { display: block; width: 600px; margin: 10px auto 14px; image-rendering: pixelated; }
+  #logo.reveal { animation: raster 2.4s steps(26) forwards; }
+  @keyframes raster { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+  #row { display: none; }
+  #cur { display: inline-block; width: 16px; height: 16px; background: var(--cursor); vertical-align: -2px; animation: blink 1s steps(1) infinite; text-shadow: none; box-shadow: 0 0 6px var(--cursor); }
+  @keyframes blink { 50% { opacity: 0; } }
+  #cmd { position: absolute; left: -9999px; opacity: 0; font-size: 16px; }
+
+  /* ---- chin: model plate, brand logo, power ---- */
+  #chin { height: 88px; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; }
+  #plate { font: 700 13px/1.2 Arial, sans-serif; letter-spacing: 1px; color: #5d6f8c; padding: 7px 14px; border-radius: 3px; background: linear-gradient(#cfc9b8, #c3bda9); box-shadow: inset 1px 1px 3px rgba(0,0,0,.25), 0 1px 0 rgba(255,255,255,.7); }
+  #brand { height: 40px; filter: drop-shadow(0 1px 0 rgba(255,255,255,.55)); opacity: .96; }
+  #pwr { display: flex; align-items: center; gap: 12px; }
+  #led { width: 9px; height: 9px; border-radius: 50%; background: #ff2a1a; box-shadow: 0 0 8px 2px rgba(255,40,20,.8), inset 0 0 2px #fff6; }
+  #power { font: 700 9px Arial, sans-serif; color: #6b6657; width: 52px; height: 42px; border: 0; border-radius: 4px; cursor: pointer; letter-spacing: .5px;
+    background: linear-gradient(#d6d0bf, #bfb8a4); box-shadow: 0 2px 0 #8f8878, 0 3px 5px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.7); }
+  #power:active { transform: translateY(2px); box-shadow: 0 0 0 #8f8878, inset 0 1px 3px rgba(0,0,0,.3); }
+  #led.dim { background: #4d1812; box-shadow: none; }
+  #off { position: absolute; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer;
+    font: 16px/32px 'PS2P', monospace; color: #8a8a8a; }
+  #off > div { animation: blink 1.6s steps(1) infinite; }
+  #off small { font-size: 8px; color: #5a5a5a; }
+  #foot { width: 780px; height: 16px; margin: 0 auto; border-radius: 0 0 14px 14px; background: linear-gradient(#b8b19e, #8f8878); box-shadow: 0 14px 24px rgba(0,0,0,.7); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="case">
+    <div id="bezel"><div id="frame"><div id="glass">
+      <div id="crt" style="visibility:hidden">
+        <div id="screen">
+          <div id="status"><span id="room"></span><span id="stats"></span></div>
+          <div id="scroll"><div id="log"></div><div id="row">&gt; <span id="typed"></span><span id="cur"></span></div></div>
+          <input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60">
+        </div>
+      </div>
+      <div id="off"><div>CLICK OR PRESS ANY KEY<br>TO POWER ON<br><small>(GOES FULL SCREEN)</small></div></div>
+      <div id="scan" class="fx"></div><div id="roll" class="fx"></div><div id="vig" class="fx"></div><div id="glare" class="fx"></div>
+    </div></div></div>
+    <div id="chin">
+      <div id="plate">GM-2064 &nbsp;COLOR MONITOR</div>
+      <img id="brand" src="assets/gammolore-full-logo.png" alt="Gammolore">
+      <div id="pwr"><div id="led" class="dim"></div><button id="power" title="Power (restart)">POWER</button></div>
+    </div>
+  </div>
+  <div id="foot"></div>
+</div>
+
+<script src="game.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const frame = () => new Promise(r => requestAnimationFrame(r));
+  const log = $('log'), row = $('row'), cmd = $('cmd'), scroll = $('scroll'), typed = $('typed'), glass = $('glass');
+  const hist = []; let hi = 0, skip = false, busy = true, powered = false, wasOn = false;
+
+  // scale the whole monitor to fit any window
+  function fit() { const s = Math.min(innerWidth / 940, innerHeight / 800); $('stage').style.transform = `scale(${s})`; }
+  addEventListener('resize', fit); fit();
+
+  const end = () => { scroll.scrollTop = scroll.scrollHeight; };
+  const wait = ms => (skip ? Promise.resolve() : sleep(ms));
+  function refresh() { const s = status(); $('room').textContent = s.room; $('stats').textContent = `Score:${s.score}/${s.max} Moves:${s.moves}`; }
+
+  // type text like an 8-bit machine: a few characters per frame; any key skips to the end
+  async function typeOut(text, per = 6, delay = 0) {
+    const t = document.createTextNode(''); log.append(t);
+    for (let i = 0; i < text.length && !skip; i += per) { t.data = text.slice(0, i + per); end(); await (delay ? sleep(delay) : frame()); }
+    t.data = text; end();
+  }
+  // the C64 "loading" border: random bands of colour
+  const C64 = ['#000', '#fff', '#883932', '#67b6bd', '#8b5429', '#55a049', '#40318d', '#bfce72', '#8b5429', '#9ae29b'];
+  async function loadingBorder(ms) {
+    for (let t = 0; t < ms && !skip; t += 50) { glass.style.background = C64[Math.floor(Math.random() * C64.length)]; await sleep(50); }
+    glass.style.background = '';
+  }
+
+  async function boot(intro) {
+    $('crt').classList.add('on'); await sleep(750);
+    if (!skip) {
+      await typeOut('**** GAMMOLORE 64 BASIC V2 ****\n\n64K RAM SYSTEM  38911 BASIC BYTES FREE\n\nREADY.\n', 3, 14);
+      await wait(500);
+      await typeOut('LOAD "ZGEN",8,1', 1, 90);
+      await wait(350);
+      await typeOut('\n\nSEARCHING FOR ZGEN\nLOADING\n', 2, 30);
+      await loadingBorder(1800);
+      await typeOut('READY.\n', 2, 30); await wait(250); await typeOut('RUN', 1, 110); await wait(500);
+    }
+    log.textContent = '';
+    const logo = new Image(); logo.id = 'logo'; logo.src = 'assets/zgen-logo-8bit.png';
+    if (!skip) logo.className = 'reveal';
+    log.append(logo);
+    $('status').style.display = 'flex'; refresh();
+    if (!skip) { loadingBorder(1300); await sleep(2600); await wait(1200); }
+    await typeOut(intro + '\n\n');
+    skip = false; busy = false; row.style.display = 'block'; end(); cmd.focus();
+  }
+
+  async function submit(v) {
+    busy = true; row.style.display = 'none';
+    log.append('> ' + v + '\n');
+    const out = run(v); refresh();
+    await typeOut(out + '\n\n');
+    skip = false; busy = false; row.style.display = 'block'; end();
+  }
+
+  cmd.addEventListener('keydown', e => {
+    if (busy) { skip = true; e.preventDefault(); return; }
+    if (e.key === 'Enter') { const v = cmd.value; cmd.value = ''; typed.textContent = ''; if (v.trim()) { hist.push(v); hi = hist.length; } submit(v); }
+    else if (e.key === 'ArrowUp') { if (hi > 0) { cmd.value = hist[--hi]; typed.textContent = cmd.value; } e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { if (hi < hist.length - 1) cmd.value = hist[++hi]; else { hi = hist.length; cmd.value = ''; } typed.textContent = cmd.value; e.preventDefault(); }
+  });
+  cmd.addEventListener('input', () => { typed.textContent = cmd.value; });
+  addEventListener('mousedown', () => { wasOn = powered; if (!powered) return powerOn(); if (busy) skip = true; setTimeout(() => cmd.focus(), 0); });
+  addEventListener('keydown', e => { if (!powered) { if (e.key !== 'F11') powerOn(); return; } cmd.focus(); });
+  $('power').addEventListener('click', () => { if (wasOn) location.reload(); }); // power button restarts once on
+
+  // Browsers only allow full screen after a click or key press, so the screen starts "off" and powering on does both.
+  function powerOn() {
+    if (powered) return; powered = true;
+    $('off').remove(); $('crt').style.visibility = 'visible'; $('led').classList.remove('dim');
+    if (location.search.includes('skip')) skip = true; // ?skip jumps past the boot sequence (and stays windowed)
+    else { const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; try { const p = f && f.call(d); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    boot(start());
+  }
+</script>
+</body>
+</html>
