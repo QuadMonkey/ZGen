@@ -5,9 +5,10 @@ const DIR = { n: 'n', north: 'n', s: 's', south: 's', e: 'e', east: 'e', w: 'w',
 const DNAME = { n: 'north', s: 'south', e: 'east', w: 'west', ne: 'northeast', nw: 'northwest', se: 'southeast', sw: 'southwest', u: 'up', d: 'down', in: 'in', out: 'out' };
 const ZW = new Set('zombie zombies walker walkers undead horde crowd soldiers driver creature monster'.split(' '));
 const ZOMBIE = { id: 'zombie', name: 'zombie', zombie: true };
-let S, out, tags, ctx = '';
+let S, out, tags, ctx = '', pending = null; // pending: a yes/no question waiting for an answer
 // Routine confirmations recede (shown dim); everything else is plain unless the caller labels it.
 const DIM = /^(.+: )?(Taken|Dropped|Done|Closed|Removed|Opened)\.|^(You can't|You don't|You already|You are carrying too much|You are not wearing|There is nothing here|There are no zombies|I don't know the word|Time passes|It is already|Nobody answers|That won't budge|Which direction|Take what|Drop what|Open what|Read what|Put what|Use what|Talk to whom)/;
+const ask = (q, yes) => { pending = yes; say(q, 'hint'); };
 const say = (s, c) => { tags.push(c || ctx || (DIM.test(s) ? 'dim' : '')); return out.push(s); };
 const aw = (k, p) => { if (!S.f['s_' + k]) { S.f['s_' + k] = 1; S.score += p; } };
 const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -420,6 +421,7 @@ function die(why) {
 
 // ---------------------------------------------------------------- ENGINE
 function init() {
+  pending = null;
   S = { room: 'bedroom', moves: 0, score: 0, hp: 3, bat: 14, over: 0, verbose: 0, zt: 0, visited: {}, f: { plugged: 'bedroom', power: 1, phone_on: 1 }, at: {}, z: { hospital: 2, mine: 1, hangar: 2, ward: 1 }, rng: 22222, last: '' };
   for (const [k, v] of Object.entries(items)) { S.at[k] = v.at; if (v.open) S.f['o_' + k] = 1; if (v.armor) S.f['a_' + k] = v.armor; }
 }
@@ -515,7 +517,7 @@ function find(ph) {
 }
 // What a UI can offer right now: exits, and every visible item with the single word that reliably names it.
 function context() {
-  if (!S || S.over) return { exits: [], items: [], zombies: 0, over: true };
+  if (!S || S.over) return { exits: [], items: [], zombies: 0, over: true, confirm: false };
   const blind = rooms[S.room].dark && !lit();
   const seen = id => vis(id) && !(blind && !carried(id));
   const resolve = w => Object.keys(items).find(id => seen(id) && items[id].al.split(' ').includes(w));
@@ -525,7 +527,7 @@ function context() {
     return word && { id, word, carried: carried(id), fixed: !!it.fixed, cont: !!it.cont, open: isOpen(id), read: !!it.read, npc: !!on.talk, openable: !!on.open, usable: !!(on.use || it.eat || it.wear) };
   }).filter(Boolean);
   const exits = Object.keys(rooms[S.room].x).filter(d => DNAME[d]).map(d => ({ dir: d, word: DNAME[d] }));
-  return { exits, items: list, zombies: S.z[S.room] || 0, blind, over: false };
+  return { exits, items: list, zombies: S.z[S.room] || 0, blind, over: false, confirm: !!pending };
 }
 const V = {};
 const def = (names, fn, free) => names.split(' ').forEach(n => (V[n] = { fn, free }));
@@ -548,6 +550,7 @@ function run(raw) {
     if (line === 'quit') { say('Thanks for playing. Close the tab, or type RESTART.'); return flush(); }
     say(S.over === 'dead' ? 'You are dead. Type RESTART, RESTORE, or QUIT.' : 'The game is over. Type RESTART or RESTORE.'); return flush();
   }
+  if (pending) { const yes = pending; pending = null; if (/^(y|yes)$/.test(line)) yes(); else say('Okay, carrying on.', 'dim'); return flush(); }
   if (!line) { say('I beg your pardon?'); return flush(); }
   let t = line.split(' ').filter(w => !['the', 'a', 'an', 'my', 'some', 'please'].includes(w)).join(' ');
   for (const [re, rep] of PH) t = t.replace(re, rep);
@@ -760,8 +763,8 @@ def('brief', () => { S.verbose = 0; say('Brief mode. Full descriptions only the 
 def('save', () => { try { localStorage.setItem('zgen', JSON.stringify(S)); say('Saved.'); } catch (e) { say('Saving failed (browser storage unavailable).'); } }, 1);
 def('restore load', () => { try { const s = localStorage.getItem('zgen'); if (!s) return say('No saved game found.'); S = JSON.parse(s); say('Restored.'); describe(true); } catch (e) { say('Restore failed.'); } }, 1);
 def('continue', () => { try { const s = localStorage.getItem('zgen-auto'); if (!s) return say('No autosaved game found.'); S = JSON.parse(s); say('Resuming your game.\n'); describe(true); } catch (e) { say('Could not resume.'); } }, 1);
-def('restart', () => { init(); describeStart(); }, 1);
-def('quit q', () => { say(`Your score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\nType RESTART to play again.`); S.over = 'quit'; }, 1);
+def('restart', () => ask('Restart from the beginning? Your current game will be lost unless you SAVE first. (Y/N)', () => { init(); describeStart(); }), 1);
+def('quit q', () => ask('Are you sure you want to quit? Unsaved progress will be lost. (Y/N)', () => { say(`Your score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\nType RESTART to play again.`); S.over = 'quit'; }), 1);
 def('help ?', () => say('ZGEN is a text adventure. You type commands; the game answers.\n\n  Move:      N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT\n  Look:      LOOK, EXAMINE <thing>, READ <thing>, SEARCH <thing>\n  Things:    TAKE, DROP, OPEN, CLOSE, PUT <x> IN <y>, WEAR, EAT, USE\n  Phone:     CHECK PHONE, TURN ON/OFF PHONE, PLUG PHONE INTO CHARGER\n  Fight:     ATTACK ZOMBIE WITH <weapon>\n  Others:    TALK, GIVE <x> TO <y>, SHOW <x> TO <y>, THROW <x> <direction>\n  Meta:      INVENTORY (I), SCORE, DIAGNOSE, SAVE, RESTORE, RESTART, QUIT, HINT\n\nTIPS: Your phone is your light and your boarding pass. Watch the battery.\nZombies get one free move on you. After that, they bite. Leave, or fight.'), 1);
 def('hint', () => {
   const H = [
@@ -783,5 +786,8 @@ function describeStart() {
 }
 function status() { const r = rooms[S.room]; return { room: r.dark && !lit() ? 'Darkness' : r.name, score: S.score, moves: S.moves, max: MAX }; }
 function start() { init(); out = []; tags = []; describeStart(); return out.join('\n'); }
+function saveInfo(key) { // what is in a saved game, without loading it: { room, score, moves } or null
+  try { const v = JSON.parse(localStorage.getItem(key)); return v && rooms[v.room] ? { room: rooms[v.room].name, score: v.score, moves: v.moves } : null; } catch (e) { return null; }
+}
 function chunks() { return out.map((t, i) => [t, tags[i]]); } // the last output, with a style label for each piece
-if (typeof module !== 'undefined') module.exports = { start, run, status, context, chunks, get S() { return S; } };
+if (typeof module !== 'undefined') module.exports = { start, run, status, context, chunks, saveInfo, get S() { return S; } };

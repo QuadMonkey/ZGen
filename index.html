@@ -81,6 +81,7 @@
   #pad { display: none; flex: none; padding-top: 6px; text-shadow: none; }
   #strip { display: none; gap: 5px; overflow-x: auto; scrollbar-width: none; padding-bottom: 6px; }
   #strip.on { display: flex; }
+  #pad.menu #keys { display: none; }
   #strip::-webkit-scrollbar { display: none; }
   #keys { display: flex; gap: 8px; }
   #dpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 38%; }
@@ -165,7 +166,7 @@
   <div id="foot"></div>
 </div>
 
-<script src="game.js?v=4"></script>
+<script src="game.js?v=5"></script>
 <script>
   const $ = id => document.getElementById(id);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -177,7 +178,7 @@
   }
   addEventListener('error', e => showError(e.message));
   addEventListener('unhandledrejection', e => showError((e.reason && e.reason.message) || e.reason));
-  const hist = []; let hi = 0, skip = false, busy = true, powered = false, wasOn = false;
+  const hist = []; let hi = 0, skip = false, busy = true, powered = false, wasOn = false, menuMode = false, started = false, newGame = null, baseMoves = 0;
 
   // ---- phone or desktop? Decided from the device, and re-decided only when the window WIDTH changes
   // (never when the on-screen keyboard changes the height, or the layout would flip mid-game).
@@ -248,7 +249,7 @@
   async function boot(intro, introChunks) {
     try { await bootSequence(intro, introChunks); }
     catch (e) { showError(e.message); log.append('\n' + intro + '\n\n'); }
-    finally { $('skiphint').remove(); skip = false; busy = false; row.style.display = 'block'; pad.classList.add('on'); end(); if (!mobile) cmd.focus(); }
+    finally { $('skiphint').remove(); if (!menuMode) started = true; skip = false; busy = false; row.style.display = 'block'; pad.classList.add('on'); end(); if (!mobile) cmd.focus(); }
   }
   async function bootSequence(intro, introChunks) {
     $('crt').classList.add('on'); await sleep(750);
@@ -267,9 +268,40 @@
     log.append(logo);
     $('status').style.display = 'flex'; refresh();
     if (!skip) { loadingBorder(1300); await sleep(2600); await wait(600); }
-    let resume = false; try { resume = !!localStorage.getItem('zgen-auto'); } catch (e) {}
-    const text = intro + (resume ? '\n\n(An autosaved game was found. Type CONTINUE to resume it.)' : '');
-    await typeChunks([...introChunks, ...(resume ? [['\n(An autosaved game was found. Type CONTINUE to resume it.)', 'dim']] : []), ['\n', '']]); announce(text); updatePad(); // (on a phone the keyboard waits until you ask for it)
+    newGame = { intro, introChunks };
+    if (menuEntries().length > 1) { menuMode = true; const m = menuChunks(); await typeChunks(m.chunks); announce(m.text); showMenu(); return; } // saved games exist: ask first
+    await typeChunks([...introChunks, ['\n', '']]); announce(intro); updatePad(); // (on a phone the keyboard waits until you ask for it)
+  }
+
+  // ---- start menu: shown when there is a saved game to go back to
+  const describe_ = i => `${i.room}, score ${i.score}, move ${i.moves}`;
+  function menuEntries() {
+    const list = [{ key: 'new', label: 'NEW GAME', short: 'NEW GAME' }], auto = saveInfo('zgen-auto'), manual = saveInfo('zgen');
+    if (auto) list.push({ key: 'continue', label: 'CONTINUE - ' + describe_(auto), short: 'CONTINUE' });
+    if (manual) list.push({ key: 'load', label: 'LOAD SAVED GAME - ' + describe_(manual), short: 'LOAD' });
+    return list;
+  }
+  function menuChunks() {
+    const e = menuEntries(), lines = e.map((x, i) => `  ${i + 1}. ${x.label}`), tail = '(Type the number, or NEW, CONTINUE or LOAD.)';
+    return { chunks: [['\nWHAT WOULD YOU LIKE TO DO?', 'room'], ...lines.map(l => [l, 'item']), [tail, 'dim'], ['\n', '']], text: ['What would you like to do?', ...lines, tail].join('\n') };
+  }
+  function showMenu() { // tap targets for phones
+    $('status').style.visibility = 'hidden'; // no score or room until a game has been chosen
+    pad.classList.add('menu'); strip.innerHTML = ''; strip.className = 'on';
+    menuEntries().forEach((x, i) => strip.append(chip(x.short, () => submit(String(i + 1)))));
+  }
+  async function menuStep(v) {
+    const t = v.trim().toLowerCase(), e = menuEntries();
+    const pick = /^\d+$/.test(t) ? e[+t - 1] : (t ? e.find(x => x.key.startsWith(t)) : null);
+    if (!pick) { const msg = 'Please choose one of the options above.'; await typeChunks([[msg, 'dim'], ['\n', '']]); announce(msg); showMenu(); return; }
+    if (pick.key !== 'new') {
+      const out = run(pick.key === 'load' ? 'restore' : 'continue'), ch = chunks();
+      if (/failed|No saved|No autosaved/.test(out)) { await typeChunks([...ch, ['\n', '']]); announce(out); showMenu(); return; }
+      menuMode = false; $('status').style.visibility = ''; pad.classList.remove('menu'); closeStrip(); refresh(); started = true; baseMoves = S.moves;
+      await typeChunks([...ch, ['\n', '']]); announce(out); return;
+    }
+    menuMode = false; $('status').style.visibility = ''; pad.classList.remove('menu'); closeStrip(); started = true; baseMoves = 0; refresh();
+    await typeChunks([...newGame.introChunks, ['\n', '']]); announce(newGame.intro);
   }
 
   async function submit(v) {
@@ -277,7 +309,8 @@
     busy = true; row.classList.add('busy'); closeStrip();
     const l = document.createElement('span'); l.className = 'cmdline'; l.dataset.cmd = v; l.textContent = '> ' + v + '\n'; log.append(l);
     const colour = v.trim().toLowerCase().match(/^colou?r(?:\s+(on|off))?$/); // COLOUR switches the text colours on or off
-    if (colour) {
+    if (menuMode) { await menuStep(v); }
+    else if (colour) {
       mono = colour[1] ? colour[1] === 'off' : !mono; document.body.classList.toggle('mono', mono);
       try { localStorage.setItem('zgen-mono', mono ? '1' : '0'); } catch (e) {}
       const msg = mono ? 'Colour is off. Type COLOUR to turn it back on.' : 'Colour is on. Type COLOUR to turn it off.';
@@ -290,7 +323,8 @@
   }
 
   // ---- autosave: phone browsers throw away background tabs, so keep the game safe
-  function autosave() { try { if (S.over) localStorage.removeItem('zgen-auto'); else if (powered) localStorage.setItem('zgen-auto', JSON.stringify(S)); } catch (e) {} }
+  function autosave() { if (!started || S.moves === baseMoves) return; try { // not until you have actually played a move, so choosing the wrong save cannot wipe a newer one
+    if (S.over) localStorage.removeItem('zgen-auto'); else if (powered) localStorage.setItem('zgen-auto', JSON.stringify(S)); } catch (e) {} }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosave(); });
   addEventListener('pagehide', autosave);
 
@@ -338,6 +372,7 @@
     if (!mobile || typeof context !== 'function') return;
     const ex = new Set(context().exits.map(e => e.dir));
     for (const b of document.querySelectorAll('#dpad [data-dir]')) b.classList.toggle('off', !ex.has(b.dataset.dir));
+    if (context().confirm && !menuMode) { strip.innerHTML = ''; strip.className = 'on'; strip.append(chip('YES', () => submit('y')), chip('NO', () => submit('n'))); } // a question is waiting
   }
   pad.addEventListener('mousedown', e => e.preventDefault()); // tapping a button must not close the keyboard
   log.addEventListener('click', e => { const t = e.target.closest && e.target.closest('.cmdline'); if (t && !busy) submit(t.dataset.cmd); }); // tap an old command to repeat it

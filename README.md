@@ -82,7 +82,19 @@ The text is colour-coded: room names in yellow, things you can pick up in cyan, 
 world moving on in pink, danger as white on a red bar, and routine replies such as "Taken." in a quiet blue. Your own commands are
 amber. Type `colour` to switch the colours off (and on again) if you prefer plain text.
 
-`save` stores your game in your browser, so it lasts until you clear your site data. `continue` resumes the autosave.
+### Saving and loading
+
+Your games are saved in **your own browser's storage** on the device you are playing on. Nothing is sent anywhere.
+
+- **Autosave:** the game saves itself every time you make a move and when you leave the tab.
+- **Manual save:** `save` keeps one extra copy that you control. `restore` (or `load`) brings it back. Saving again replaces it.
+- **Start menu:** if a saved game exists, the game asks what you want when it starts: **New game**, **Continue** (the autosave) or
+  **Load saved game**. Each option shows the room, score and move number so you can tell them apart. Choosing New game does not delete
+  your saves. Autosaving only starts once you have made a move, so choosing the wrong save cannot wipe a newer one.
+- **`quit` and `restart` ask "are you sure?"** first. Answer `y` or `yes` to go ahead; anything else cancels.
+
+Saves belong to one browser, on one device, at one web address. They do not follow you to another phone or computer, and clearing
+the site's data (or using a private window) removes them.
 
 ## How survival works
 

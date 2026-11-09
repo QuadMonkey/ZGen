@@ -128,3 +128,36 @@ console.log('throw-from-backpack ok');
   g.S.moves = 11; g.run('wait'); assert(labels().includes('event'), 'timed events are labelled');
   console.log('colour labels ok');
 }
+
+// -- quit and restart ask first
+{
+  g.start(); g.run('e');
+  assert(g.run('quit').includes('Are you sure'), 'quit should ask');
+  assert.strictEqual(g.S.over, 0, 'still playing while the question is open');
+  assert.strictEqual(g.context().confirm, true, 'the UI is told a question is waiting');
+  assert(g.run('n').includes('carrying on'), 'No cancels');
+  assert.strictEqual(g.context().confirm, false);
+  assert.strictEqual(g.S.room, 'hall', 'game untouched after cancelling');
+  g.run('quit'); assert(g.run('something else').includes('carrying on'), 'anything but yes cancels');
+  g.run('quit'); g.run('yes'); assert.strictEqual(g.S.over, 'quit', 'yes quits');
+  g.start(); g.run('e'); g.run('wait');
+  assert(g.run('restart').includes('lost unless you SAVE'), 'restart should warn');
+  g.run('no'); assert.strictEqual(g.S.moves, 2, 'declined restart keeps the game');
+  g.run('restart'); g.run('y'); assert.strictEqual(g.S.moves, 0, 'confirmed restart starts again');
+  assert.strictEqual(g.S.room, 'bedroom');
+  // once the game is over, no question is needed
+  g.S.over = 'dead'; assert(g.run('restart').includes('ZGEN'), 'restart after death is immediate');
+  console.log('quit/restart confirmation ok');
+}
+
+// -- saved games can be described for the start menu
+{
+  const store = {}; global.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => delete store[k] };
+  g.start(); assert.strictEqual(g.saveInfo('zgen'), null, 'no save yet');
+  g.run('e'); g.run('save');
+  const info = g.saveInfo('zgen'); assert.deepStrictEqual(info, { room: 'Upstairs Hall', score: 0, moves: 1 }, JSON.stringify(info));
+  g.start(); assert(g.run('restore').includes('Restored'), 'load works'); assert.strictEqual(g.S.room, 'hall');
+  store.zgen = '{broken'; assert.strictEqual(g.saveInfo('zgen'), null, 'a damaged save is ignored, not a crash');
+  delete global.localStorage;
+  console.log('save info ok');
+}
