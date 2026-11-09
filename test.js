@@ -202,3 +202,23 @@ console.log('throw-from-backpack ok');
   }
   console.log('voice and phone texts ok');
 }
+
+// -- sound cues: the engine says which sound belongs to an event; the page plays it
+{
+  const fresh = () => { g.start(); g.S.at.phone = 'inv'; g.S.f.phone_on = 1; g.S.bat = 90; };
+  fresh(); g.S.room = 'pharmacy'; g.S.z.pharmacy = 1; g.S.at.bat = 'inv';
+  g.run('attack zombie'); assert(g.sfxList().includes('strike'), 'hitting a zombie plays strike');
+  g.S.z.pharmacy = 1; g.S.at.bat = 'bedroom'; g.run('attack zombie'); assert(g.sfxList().includes('strike'), 'punching plays strike too');
+  g.S.z.pharmacy = 0; g.run('attack zombie'); assert.deepStrictEqual(g.sfxList(), [], 'no zombie, no sound');
+  g.run('look'); assert.deepStrictEqual(g.sfxList(), [], 'ordinary commands are silent');
+  fresh(); g.S.room = 'bedroom'; g.S.at.backpack = 'bedroom'; g.run('take backpack'); assert(g.sfxList().includes('ding2'), 'earning points plays ding2');
+  g.run('drop backpack'); g.run('take backpack'); assert(!g.sfxList().includes('ding2'), 'points are only awarded once, so no repeat sound');
+  // the phone rings when the alert and the texts arrive, but only if the phone is with you and on
+  for (const [move, label] of [[5, 'alert'], [9, 'first texts'], [29, 'garage text'], [44, 'blackout texts']]) {
+    fresh(); g.S.moves = move; g.run('wait'); assert(g.sfxList().includes('ding'), `${label}: phone notification expected`);
+    fresh(); g.S.moves = move; g.S.at.phone = 'garage'; g.run('wait'); assert(!g.sfxList().includes('ding'), `${label}: phone is in another room, so no ding`);
+    fresh(); g.S.moves = move; g.S.f.phone_on = 0; g.run('wait'); assert(!g.sfxList().includes('ding'), `${label}: phone is off, so no ding`);
+  }
+  fresh(); g.S.moves = 12; g.run('wait'); assert(!g.sfxList().includes('ding'), 'no notification at an ordinary moment');
+  console.log('sound cues ok');
+}

@@ -5,12 +5,14 @@ const DIR = { n: 'n', north: 'n', s: 's', south: 's', e: 'e', east: 'e', w: 'w',
 const DNAME = { n: 'north', s: 'south', e: 'east', w: 'west', ne: 'northeast', nw: 'northwest', se: 'southeast', sw: 'southwest', u: 'up', d: 'down', in: 'in', out: 'out' };
 const ZW = new Set('zombie zombies walker walkers undead horde crowd soldiers driver creature monster'.split(' '));
 const ZOMBIE = { id: 'zombie', name: 'zombie', zombie: true };
-let S, out, tags, ctx = '', pending = null; // pending: a yes/no question waiting for an answer
+let S, out, tags, ctx = '', pending = null, sounds = []; // pending: a yes/no question waiting for an answer
 // Routine confirmations recede (shown dim); everything else is plain unless the caller labels it.
 const DIM = /^(.+: )?(Taken|Dropped|Done|Closed|Removed|Opened)\.|^(You can't|You don't|You already|You are carrying too much|You are not wearing|There is nothing here|There are no zombies|I don't know the word|You wait\.|It is already|Nobody answers|That won't budge|Which direction|Take what|Drop what|Open what|Read what|Put what|Use what|Talk to whom)/;
 const ask = (q, yes) => { pending = yes; say(q, 'hint'); };
 const say = (s, c) => { tags.push(c || ctx || (DIM.test(s) ? 'dim' : '')); return out.push(s); };
-const aw = (k, p) => { if (!S.f['s_' + k]) { S.f['s_' + k] = 1; S.score += p; } };
+const sfx = n => sounds.push(n);
+const buzz = () => { if (vis('phone') && S.f.phone_on) sfx('ding'); }; // a phone notification, if you can hear your phone
+const aw = (k, p) => { if (!S.f['s_' + k]) { S.f['s_' + k] = 1; S.score += p; sfx('ding2'); } };
 const cap = s => s[0].toUpperCase() + s.slice(1);
 const ids = loc => Object.keys(items).filter(i => S.at[i] === loc);
 const isOpen = i => !!S.f['o_' + i];
@@ -473,12 +475,13 @@ function spawn(room, n) {
   if (S.room === room) { S.zt = 0; say(n > 1 ? 'More zombies stagger in!' : 'A zombie staggers in from out of nowhere!', 'danger'); }
 }
 const EV = [
-  [6, () => say(vis('phone') ? '\nYour phone shrieks an alarm tone it has never made before. EMERGENCY ALERT. (Try CHECK PHONE.)' : '\nFar off, from wherever you left it, your phone shrieks an alarm tone it has never made before.'), () => S.f.alert = 1],
+  [6, () => say(vis('phone') ? '\nYour phone shrieks an alarm tone it has never made before. EMERGENCY ALERT. (Try CHECK PHONE.)' : '\nFar off, from wherever you left it, your phone shrieks an alarm tone it has never made before.'), () => { S.f.alert = 1; buzz(); }],
+  [10, () => buzz()],
   [12, () => say('\nOutside, sirens begin to wail, then too many at once. Somewhere a helicopter thuds past, low.')],
   [20, () => { spawn('pharmacy', 1); spawn('quik', 1); }],
-  [30, () => { if (S.f.barricade) say('\nSomething heavy slams the front door. The couch holds. After a while the thumping fades, and a slow shuffle moves off down the street.'); else { say('\nThe front door splinters inward!'); spawn('living', 1); } spawn('harbor', 4); }],
+  [30, () => { buzz(); if (S.f.barricade) say('\nSomething heavy slams the front door. The couch holds. After a while the thumping fades, and a slow shuffle moves off down the street.'); else { say('\nThe front door splinters inward!'); spawn('living', 1); } spawn('harbor', 4); }],
   [35, () => { spawn('maple', 1); spawn('main_st', 1); }],
-  [45, () => { S.f.power = 0; S.f.plugged = 0; say('\nThe lights flicker, die, and a fridge somewhere goes silent. The power is out. Charging is no longer possible.'); }],
+  [45, () => { buzz(); S.f.power = 0; S.f.plugged = 0; say('\nThe lights flicker, die, and a fridge somewhere goes silent. The power is out. Charging is no longer possible.'); }],
   [50, () => { spawn('square', 2); spawn('cafe', 1); spawn('police', 2); spawn('park', 1); }],
   [65, () => { spawn('mall', 2); spawn('ramp', 1); spawn('riverside', 1); spawn('hardware', 1); }],
   [90, () => { spawn('main_st', 1); spawn('maple', 1); }]
@@ -549,7 +552,7 @@ const PH = [[/^pick up (.+)/, 'take $1'], [/^pick (.+) up$/, 'take $1'], [/^put 
   [/^(swipe|scan|tap|insert) (.+)/, 'swipe $2'], [/^(connect|plug) (.+)/, 'plug $2'], [/^go to (.+)/, 'enter $1'], [/^(\d{4})$/, 'code $1'], [/^(g|again)$/, 'again']];
 const PREP = new Set('with using into in on to at from onto toward'.split(' '));
 function run(raw) {
-  out = []; tags = [];
+  out = []; tags = []; sounds = [];
   const flush = () => out.join('\n');
   let line = raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   if (S.over) {
@@ -697,8 +700,8 @@ def('attack kill hit fight stab swing punch', (a, b, P) => {
   const w = b && b.wp ? b : b ? null : ids('inv').concat(ids('worn')).map(i => items[i]).find(i => i.wp);
   if (b && b.wp && !carried(b.id)) return say(`You aren't holding ${b.n}.`);
   if (b && !b.wp) return say(`Hitting a zombie with ${b.n} is a bold choice, but not an effective one.`);
-  if (!w) return say('You punch the zombie with your bare hand. Your knuckles hurt. The zombie is unimpressed.');
-  S.z[S.room]--; aw('kill', 3);
+  if (!w) { sfx('strike'); return say('You punch the zombie with your bare hand. Your knuckles hurt. The zombie is unimpressed.'); }
+  S.z[S.room]--; sfx('strike'); aw('kill', 3);
   say((b ? '' : `(with ${w.n})\n`) + w.wp.msg);
   if (w.wp.risk) bite('the zombie');
   if (!S.z[S.room]) say('The room is still.');
@@ -793,9 +796,10 @@ function describeStart() {
   describe(true);
 }
 function status() { const r = rooms[S.room]; return { room: r.dark && !lit() ? 'Darkness' : r.name, score: S.score, moves: S.moves, max: MAX }; }
-function start() { init(); out = []; tags = []; describeStart(); return out.join('\n'); }
+function start() { init(); out = []; tags = []; sounds = []; describeStart(); return out.join('\n'); }
 function saveInfo(key) { // what is in a saved game, without loading it: { room, score, moves } or null
   try { const v = JSON.parse(localStorage.getItem(key)); return v && rooms[v.room] ? { room: rooms[v.room].name, score: v.score, moves: v.moves } : null; } catch (e) { return null; }
 }
+function sfxList() { return sounds.slice(); } // sounds to play for the last output, in order
 function chunks() { return out.map((t, i) => [t, tags[i]]); } // the last output, with a style label for each piece
-if (typeof module !== 'undefined') module.exports = { start, run, status, context, chunks, saveInfo, get S() { return S; } };
+if (typeof module !== 'undefined') module.exports = { start, run, status, context, chunks, sfxList, saveInfo, get S() { return S; } };

@@ -82,6 +82,12 @@ The text is color-coded: room names in yellow, things you can pick up in cyan, p
 world moving on in pink, danger as white on a red bar, and routine replies such as "Taken." in a quiet blue. Your own commands are
 amber. Type `color` to switch the colors off (and on again) if you prefer plain text.
 
+### Sound
+
+A short startup jingle plays when the ZGen logo appears, and there are three sound effects: a thump when you hit a zombie, a phone notification chime when your phone gets the alert or a new text,
+and a blip when you score points. Type `sound` to switch them off and on (or `mute` and `unmute`). Sound is only an extra: everything
+that happens is always in the text too, and a phone that is off, dead or left in another room makes no sound.
+
 ### Saving and loading
 
 Your games are saved in **your own browser's storage** on the device you are playing on. Nothing is sent anywhere.

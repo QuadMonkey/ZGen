@@ -168,7 +168,7 @@
   <div id="foot"></div>
 </div>
 
-<script src="game.js?v=5"></script>
+<script src="game.js?v=6"></script>
 <script>
   const $ = id => document.getElementById(id);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -187,6 +187,22 @@
   const isPhone = () => location.search.includes('mobile') || (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 600) || innerWidth < 700; // ?mobile forces phone mode (handy for testing)
   let mobile = isPhone(), lastW = innerWidth, baseH = 0;
   let mono = false; try { mono = localStorage.getItem('zgen-mono') === '1'; } catch (e) {}
+  // ---- sound effects: the engine names the cue, the page plays it. The three files differ by about 14 dB, so volumes are evened out here.
+  const SFX = { strike: 0.35, ding: 1, ding2: 0.55 }, sfxEls = {};
+  let sound = true; try { sound = localStorage.getItem('zgen-sound') !== '0'; } catch (e) {}
+  function loadSounds() {
+    for (const n in SFX) { const a = new Audio('assets/sounds/' + n + '.mp3'); a.preload = 'auto'; sfxEls[n] = a; }
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); fetch('assets/sounds/startup.mp3').then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).then(b => { startupBuf = b; }).catch(() => {}); } catch (e) {}
+  }
+  let actx, startupBuf; // the startup jingle uses Web Audio: a context started during the power-on tap stays allowed to play later
+  function playStartup() {
+    if (!sound || !actx || !startupBuf) return;
+    const src = actx.createBufferSource(), vol = actx.createGain(); src.buffer = startupBuf; vol.gain.value = 0.5; src.connect(vol); vol.connect(actx.destination); src.start();
+  }
+  function playSounds(names) { // called straight after a command, so the browser still counts it as the player's own action
+    if (!sound) return;
+    for (const n of new Set(names)) { const a = sfxEls[n] && sfxEls[n].cloneNode(); if (a) { a.volume = SFX[n]; a.play().catch(() => {}); } }
+  }
   const SIZES = [12, 16, 10]; let sizeIx = 0;
   try { sizeIx = Math.max(0, SIZES.indexOf(+localStorage.getItem('zgen-fs'))); } catch (e) {}
 
@@ -268,7 +284,7 @@
     log.textContent = '';
     const logo = new Image(); logo.id = 'logo'; logo.src = 'assets/zgen-logo-8bit.png'; logo.alt = 'ZGen';
     if (!skip) logo.className = 'reveal';
-    log.append(logo);
+    log.append(logo); if (!skip) playStartup(); // the jingle lasts about 3 seconds, matching the logo reveal
     $('status').style.display = 'flex'; refresh();
     if (!skip) { loadingBorder(1300); await sleep(2600); await wait(600); }
     newGame = { intro, introChunks };
@@ -312,14 +328,21 @@
     busy = true; row.classList.add('busy'); closeStrip();
     const l = document.createElement('span'); l.className = 'cmdline'; l.dataset.cmd = v; l.textContent = '> ' + v + '\n'; log.append(l);
     const colour = v.trim().toLowerCase().match(/^colou?r(?:\s+(on|off))?$/); // COLOUR switches the text colours on or off
+    const snd = v.trim().toLowerCase().match(/^(sound|sfx|mute|unmute)(?:\s+(on|off))?$/); // SOUND / MUTE / UNMUTE
     if (menuMode) { await menuStep(v); }
+    else if (snd) {
+      sound = snd[2] ? snd[2] === 'on' : snd[1] === 'unmute' ? true : snd[1] === 'mute' ? false : !sound;
+      try { localStorage.setItem('zgen-sound', sound ? '1' : '0'); } catch (e) {}
+      const msg = sound ? 'Sound is on. Type SOUND to turn it off.' : 'Sound is off. Type SOUND to turn it back on.';
+      await typeChunks([[msg, 'dim'], ['\n', '']]); announce(msg);
+    }
     else if (colour) {
       mono = colour[1] ? colour[1] === 'off' : !mono; document.body.classList.toggle('mono', mono);
       try { localStorage.setItem('zgen-mono', mono ? '1' : '0'); } catch (e) {}
       const msg = mono ? 'Color is off. Type COLOR to turn it back on.' : 'Color is on. Type COLOR to turn it off.';
       await typeChunks([[msg, 'dim'], ['\n', '']]); announce(msg);
     } else {
-      const out = run(v), pieces = chunks(); refresh();
+      const out = run(v), pieces = chunks(); playSounds(typeof sfxList === 'function' ? sfxList() : []); refresh();
       await typeChunks([...pieces, ['\n', '']]); announce(out);
     }
     skip = false; busy = false; row.classList.remove('busy'); end(); autosave();
@@ -401,7 +424,7 @@
   // Browsers only allow full screen after a click or key press, so the screen starts "off" and powering on does both.
   function powerOn() {
     if (powered) return; powered = true;
-    $('off').remove(); $('crt').style.visibility = 'visible'; $('led').classList.remove('dim');
+    loadSounds(); $('off').remove(); $('crt').style.visibility = 'visible'; $('led').classList.remove('dim');
     if (location.search.includes('skip')) skip = true; // ?skip jumps past the boot sequence (and stays windowed)
     else goFs();
     fsState();
