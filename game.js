@@ -780,8 +780,8 @@ def('hint', () => {
 }, 1);
 
 function describeStart() {
-  say('ZGEN: The Z Stands for Generation and Zombies', 'room');
-  say('An Interactive Survival Fiction\nCopyright (c) 2026 Gammolore. All rights reserved.\nZGEN is a work of fiction. Any resemblance to your group chat is purely coincidental.\nRelease 1 / Serial number 261109\n\n(Type HELP if you are new to this.)\n', 'dim');
+  say('ZGEN: When Gen Z meets the Zombie Apocalypse', 'room');
+  say('An Interactive Survival Fiction\nCopyright (c) 2026 Gammolore. All rights reserved.\nZGEN is a work of fiction. Any resemblance to your snapchat is purely coincidental.\nRelease 1 / Serial number 261109\n\n(Type HELP if you are new to this.)\n', 'dim');
   describe(true);
 }
 function status() { const r = rooms[S.room]; return { room: r.dark && !lit() ? 'Darkness' : r.name, score: S.score, moves: S.moves, max: MAX }; }
