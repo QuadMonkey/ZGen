@@ -2,13 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#161616">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>ZGEN - A Gammolore Game</title>
 <link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="preload" href="assets/fonts/PressStart2P.ttf" as="font" type="font/ttf" crossorigin>
 <style>
   @font-face { font-family: 'PS2P'; src: url(assets/fonts/PressStart2P.ttf) format('truetype'); }
-  :root { --blue: #0055aa; --border: #0055aa; --cursor: #ff8800; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, #3b352c 0%, #16130f 65%, #070605 100%); }
+  :root { --blue: #0055aa; --border: #0055aa; --cursor: #ff8800; --fs: 12px; }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    background: radial-gradient(ellipse at 50% 38%, #3b352c 0%, #16130f 65%, #070605 100%); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* Everything is drawn at a fixed size, then scaled to fit the window by fit() below. */
   #stage { position: absolute; left: 50%; top: 50%; width: 900px; height: 770px; margin: -385px 0 0 -450px; }
@@ -43,16 +50,34 @@
   @keyframes flick { 0% { opacity: 1; } 50% { opacity: .965; } }
   #status { display: none; background: #fff; color: var(--blue); padding: 0 0; text-shadow: none; justify-content: space-between; flex: none; line-height: 20px; }
   #status span { white-space: pre; }
-  #scroll { flex: 1; overflow-y: auto; scrollbar-width: none; }
+  #scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }
   #scroll::-webkit-scrollbar { display: none; }
   #log, #row { white-space: pre-wrap; overflow-wrap: anywhere; }
-  #logo { display: block; width: 600px; margin: 10px auto 14px; image-rendering: pixelated; }
+  #logo { display: block; width: 600px; max-width: 100%; margin: 10px auto 14px; image-rendering: pixelated; }
   #logo.reveal { animation: raster 2.4s steps(26) forwards; }
   @keyframes raster { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
-  #row { display: none; }
-  #cur { display: inline-block; width: 16px; height: 16px; background: var(--cursor); vertical-align: -2px; animation: blink 1s steps(1) infinite; text-shadow: none; box-shadow: 0 0 6px var(--cursor); }
+  /* The real input sits invisibly on top of the prompt line: tapping the line opens the keyboard, and the input is always on screen. */
+  #row { display: none; position: relative; }
+  #row.busy { opacity: 0; }
+  #cur { display: inline-block; width: 1em; height: 1em; background: var(--cursor); vertical-align: -2px; animation: blink 1s steps(1) infinite; text-shadow: none; box-shadow: 0 0 6px var(--cursor); }
   @keyframes blink { 50% { opacity: 0; } }
-  #cmd { position: absolute; left: -9999px; opacity: 0; font-size: 16px; }
+  #cmd { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; border: 0; padding: 0; margin: 0; background: transparent; color: transparent; caret-color: transparent; }
+  .cmdline { cursor: pointer; }
+
+  /* ---- tap buttons (phones only) ---- */
+  #pad { display: none; flex: none; padding-top: 6px; text-shadow: none; }
+  #strip { display: none; gap: 5px; overflow-x: auto; scrollbar-width: none; padding-bottom: 6px; }
+  #strip.on { display: flex; }
+  #strip::-webkit-scrollbar { display: none; }
+  #keys { display: flex; gap: 8px; }
+  #dpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 38%; }
+  #verbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; flex: 1; }
+  .chip { font: 10px/1 'PS2P', monospace; height: 38px; min-width: 44px; padding: 0 2px; color: #fff; background: #08366c; border: 1px solid #6fa8ff; border-radius: 5px;
+    box-shadow: 0 2px 0 #021d3d; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; white-space: nowrap; }
+  #strip .chip { flex: none; padding: 0 12px; }
+  .chip:active { transform: translateY(2px); box-shadow: none; background: #0d4a94; }
+  .chip.off { opacity: .35; }
+  .chip.hot { background: var(--cursor); color: #000; border-color: #ffd08a; }
 
   /* ---- chin: model plate, brand logo, power ---- */
   #chin { height: 88px; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; }
@@ -69,21 +94,50 @@
   #off > div { animation: blink 1.6s steps(1) infinite; }
   #off small { font-size: 8px; color: #5a5a5a; }
   #foot { width: 780px; height: 16px; margin: 0 auto; border-radius: 0 0 14px 14px; background: linear-gradient(#b8b19e, #8f8878); box-shadow: 0 14px 24px rgba(0,0,0,.7); }
+
+  /* ================= PHONE MODE: no cabinet, the CRT picture fills the screen ================= */
+  body.mobile #stage { position: fixed; left: 0; right: 0; top: 0; width: auto; height: 100dvh; margin: 0; transform: none !important; }
+  body.mobile #case, body.mobile #bezel, body.mobile #frame { display: contents; }
+  body.mobile #case::before, body.mobile #chin, body.mobile #foot { display: none; }
+  body.mobile #glass { position: absolute; inset: 0; width: auto; height: auto; border-radius: 0; }
+  body.mobile #crt { padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); }
+  body.mobile #screen { width: 100%; height: 100%; font-size: var(--fs); line-height: calc(var(--fs) * 1.4); animation: none; }
+  body.mobile #status { flex-wrap: wrap; line-height: calc(var(--fs) * 1.4); }
+  body.mobile #roll { display: none; }
+  body.mobile #row { min-height: 38px; padding-top: 4px; }
+  body.mobile .cmdline { text-decoration: underline dotted; text-underline-offset: 3px; }
+  body.mobile #off { font-size: 14px; }
+  body.mobile #pad.on { display: block; }
+  body.mobile.kbd #pad { display: none; } /* the keyboard is open: give the story the room */
+  @media (orientation: landscape) and (max-height: 560px) {
+    body.mobile #screen { display: grid; grid-template-columns: 1fr minmax(220px, 38%); grid-template-rows: auto 1fr; }
+    body.mobile #status { grid-column: 1 / 3; }
+    body.mobile #scroll { grid-column: 1; grid-row: 2; }
+    body.mobile #pad { grid-column: 2; grid-row: 2; overflow-y: auto; padding: 0 0 0 8px; }
+    body.mobile #keys { flex-direction: column; }
+    body.mobile #dpad { width: 100%; }
+    body.mobile .chip { height: 32px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #screen, #roll, #cur, #off > div, #logo.reveal, #crt.on { animation: none !important; }
+  }
 </style>
 </head>
 <body>
+<div id="sr" class="sr-only" role="log" aria-live="polite" aria-relevant="additions"></div>
 <div id="stage">
   <div id="case">
     <div id="bezel"><div id="frame"><div id="glass">
       <div id="crt" style="visibility:hidden">
         <div id="screen">
-          <div id="status"><span id="room"></span><span id="stats"></span></div>
-          <div id="scroll"><div id="log"></div><div id="row">&gt; <span id="typed"></span><span id="cur"></span></div></div>
-          <input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60">
+          <div id="status" aria-hidden="true"><span id="room"></span><span id="stats"></span></div>
+          <div id="scroll"><div id="log" aria-hidden="true"></div><div id="row"><span aria-hidden="true">&gt; <span id="typed"></span><span id="cur"></span></span><input id="cmd" aria-label="Type a command and press Enter" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" maxlength="60"></div></div>
+          <div id="pad"><div id="strip"></div><div id="keys"><div id="dpad"></div><div id="verbs"></div></div></div>
         </div>
       </div>
-      <div id="off"><div>CLICK OR PRESS ANY KEY<br>TO POWER ON<br><small>(GOES FULL SCREEN)</small></div></div>
-      <div id="scan" class="fx"></div><div id="roll" class="fx"></div><div id="vig" class="fx"></div><div id="glare" class="fx"></div>
+      <div id="off"><div id="offtext">CLICK OR PRESS ANY KEY<br>TO POWER ON<br><small id="fsnote">(GOES FULL SCREEN)</small></div></div>
+      <div id="scan" class="fx" aria-hidden="true"></div><div id="roll" class="fx" aria-hidden="true"></div><div id="vig" class="fx" aria-hidden="true"></div><div id="glare" class="fx" aria-hidden="true"></div>
     </div></div></div>
     <div id="chin">
       <div id="plate">GM-2064 &nbsp;COLOR MONITOR</div>
@@ -99,19 +153,48 @@
   const $ = id => document.getElementById(id);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const frame = () => new Promise(r => requestAnimationFrame(r));
-  const log = $('log'), row = $('row'), cmd = $('cmd'), scroll = $('scroll'), typed = $('typed'), glass = $('glass');
+  const log = $('log'), row = $('row'), cmd = $('cmd'), scroll = $('scroll'), typed = $('typed'), glass = $('glass'), stage = $('stage'), sr = $('sr'), pad = $('pad'), strip = $('strip');
   const hist = []; let hi = 0, skip = false, busy = true, powered = false, wasOn = false;
 
-  // scale the whole monitor to fit any window
-  function fit() { const s = Math.min(innerWidth / 940, innerHeight / 800); $('stage').style.transform = `scale(${s})`; }
-  addEventListener('resize', fit); fit();
+  // ---- phone or desktop? Decided from the device, and re-decided only when the window WIDTH changes
+  // (never when the on-screen keyboard changes the height, or the layout would flip mid-game).
+  const isPhone = () => location.search.includes('mobile') || (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 600) || innerWidth < 700; // ?mobile forces phone mode (handy for testing)
+  let mobile = isPhone(), lastW = innerWidth, baseH = 0;
+  const SIZES = [12, 16, 10]; let sizeIx = 0;
+  try { sizeIx = Math.max(0, SIZES.indexOf(+localStorage.getItem('zgen-fs'))); } catch (e) {}
 
   const end = () => { scroll.scrollTop = scroll.scrollHeight; };
+  function fit() { // desktop: scale the whole monitor to fit the window
+    if (mobile) { stage.style.transform = 'none'; return; }
+    stage.style.transform = `scale(${Math.min(innerWidth / 940, innerHeight / 800)})`;
+  }
+  function layout() { // phone: follow the visible area, so the keyboard never covers the prompt
+    if (!mobile) return;
+    const vv = window.visualViewport, h = vv ? vv.height : innerHeight;
+    baseH = Math.max(baseH, innerHeight, h);
+    stage.style.top = (vv ? vv.offsetTop : 0) + 'px'; stage.style.height = h + 'px';
+    document.body.classList.toggle('kbd', h < baseH * 0.8);
+    end();
+  }
+  function applyMode() {
+    document.body.classList.toggle('mobile', mobile);
+    document.documentElement.style.setProperty('--fs', SIZES[sizeIx] + 'px');
+    if (mobile) { $('offtext').firstChild.textContent = 'TAP THE SCREEN'; layout(); }
+    else { stage.style.top = ''; stage.style.height = ''; $('offtext').firstChild.textContent = 'CLICK OR PRESS ANY KEY'; fit(); }
+    const d = document.documentElement;
+    if (!(d.requestFullscreen || d.webkitRequestFullscreen)) $('fsnote').style.display = 'none'; // e.g. iPhone has no full screen
+  }
+  addEventListener('resize', () => { if (innerWidth !== lastW) { lastW = innerWidth; baseH = 0; mobile = isPhone(); applyMode(); } else if (mobile) layout(); });
+  addEventListener('orientationchange', () => { baseH = 0; setTimeout(layout, 300); });
+  if (window.visualViewport) { visualViewport.addEventListener('resize', layout); visualViewport.addEventListener('scroll', layout); }
+  cmd.addEventListener('focus', () => { setTimeout(() => { scrollTo(0, 0); layout(); }, 60); setTimeout(() => scrollTo(0, 0), 350); }); // stop iOS jumping the page
+
   const wait = ms => (skip ? Promise.resolve() : sleep(ms));
-  function refresh() { const s = status(); $('room').textContent = s.room; $('stats').textContent = `Score:${s.score}/${s.max} Moves:${s.moves}`; }
+  function refresh() { const s = status(); $('room').textContent = s.room; $('stats').textContent = `Score:${s.score}/${s.max} Moves:${s.moves}`; updatePad(); }
+  function announce(text) { const d = document.createElement('div'); d.textContent = text; sr.append(d); while (sr.children.length > 6) sr.firstChild.remove(); }
 
   // type text like an 8-bit machine: a few characters per frame; any key skips to the end
-  async function typeOut(text, per = 6, delay = 0) {
+  async function typeOut(text, per = mobile ? 18 : 6, delay = 0) {
     const t = document.createTextNode(''); log.append(t);
     for (let i = 0; i < text.length && !skip; i += per) { t.data = text.slice(0, i + per); end(); await (delay ? sleep(delay) : frame()); }
     t.data = text; end();
@@ -135,32 +218,90 @@
       await typeOut('READY.\n', 2, 30); await wait(250); await typeOut('RUN', 1, 110); await wait(500);
     }
     log.textContent = '';
-    const logo = new Image(); logo.id = 'logo'; logo.src = 'assets/zgen-logo-8bit.png';
+    const logo = new Image(); logo.id = 'logo'; logo.src = 'assets/zgen-logo-8bit.png'; logo.alt = 'ZGen';
     if (!skip) logo.className = 'reveal';
     log.append(logo);
     $('status').style.display = 'flex'; refresh();
     if (!skip) { loadingBorder(1300); await sleep(2600); await wait(1200); }
-    await typeOut(intro + '\n\n');
-    skip = false; busy = false; row.style.display = 'block'; end(); cmd.focus();
+    let resume = false; try { resume = !!localStorage.getItem('zgen-auto'); } catch (e) {}
+    const text = intro + (resume ? '\n\n(An autosaved game was found. Type CONTINUE to resume it.)' : '');
+    await typeOut(text + '\n\n'); announce(text);
+    skip = false; busy = false; row.style.display = 'block'; pad.classList.add('on'); updatePad(); end();
+    if (!mobile) cmd.focus(); // on a phone the keyboard waits until you ask for it
   }
 
   async function submit(v) {
-    busy = true; row.style.display = 'none';
-    log.append('> ' + v + '\n');
+    if (busy) { skip = true; return; }
+    busy = true; row.classList.add('busy'); closeStrip();
+    const l = document.createElement('span'); l.className = 'cmdline'; l.dataset.cmd = v; l.textContent = '> ' + v + '\n'; log.append(l);
     const out = run(v); refresh();
-    await typeOut(out + '\n\n');
-    skip = false; busy = false; row.style.display = 'block'; end();
+    await typeOut(out + '\n\n'); announce(out);
+    skip = false; busy = false; row.classList.remove('busy'); end(); autosave();
   }
+
+  // ---- autosave: phone browsers throw away background tabs, so keep the game safe
+  function autosave() { try { if (S.over) localStorage.removeItem('zgen-auto'); else if (powered) localStorage.setItem('zgen-auto', JSON.stringify(S)); } catch (e) {} }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosave(); });
+  addEventListener('pagehide', autosave);
+
+  // ---- tap buttons: directions, verbs, and the things actually in the room
+  const chip = (label, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (cls ? ' ' + cls : ''); b.textContent = label; if (fn) b.addEventListener('click', fn); return b; };
+  const carriedLoose = c => c.items.filter(i => i.carried && !i.fixed), npcs = c => c.items.filter(i => i.npc);
+  // [label, command word, first-choice list, joining word, second-choice list]; no list = do it straight away
+  const VERBS = [
+    ['TAKE', 'take', c => c.items.filter(i => !i.carried && !i.fixed)], ['DROP', 'drop', carriedLoose], ['EXAM', 'examine', c => c.items], ['READ', 'read', c => c.items.filter(i => i.read)],
+    ['OPEN', 'open', c => c.items.filter(i => (i.cont && !i.open) || i.openable)], ['USE', 'use', c => c.items.filter(i => i.carried || i.usable)], ['TALK', 'talk', npcs], ['GIVE', 'give', carriedLoose, 'to', npcs],
+    ['ATTK', 'attack zombie'], ['THRW', 'throw', carriedLoose, '', c => c.exits.map(e => ({ word: e.dir, label: e.dir.toUpperCase() }))], ['PUT', 'put', carriedLoose, 'in', c => c.items.filter(i => i.cont && i.open)], ['WAIT', 'wait'],
+    ['INV', 'inventory'], ['HINT', 'hint'], ['SCOR', 'score'], ['AA', null]
+  ];
+  let hot = null;
+  function closeStrip() { hot = null; strip.className = ''; strip.innerHTML = ''; for (const b of $('verbs').children) b.classList.remove('hot'); }
+  function offer(options, pick) {
+    strip.innerHTML = ''; strip.className = 'on';
+    if (!options.length) strip.append(chip('NOTHING HERE', null, 'off'));
+    for (const o of options) strip.append(chip((o.label || o.word).toUpperCase(), () => pick(o)));
+    strip.append(chip('X', closeStrip)); strip.scrollLeft = 0;
+  }
+  function verbTap(v, btn) {
+    if (busy) { skip = true; return; }
+    if (hot === btn) return closeStrip();
+    closeStrip();
+    const [label, word, first, join, second] = v;
+    if (!word) { sizeIx = (sizeIx + 1) % SIZES.length; try { localStorage.setItem('zgen-fs', SIZES[sizeIx]); } catch (e) {} return applyMode(); }
+    if (!first) return submit(word);
+    hot = btn; btn.classList.add('hot');
+    offer(first(context()), a => {
+      if (!second) { closeStrip(); return submit(`${word} ${a.word}`); }
+      offer(second(context()).filter(b => b.word !== a.word), b => { closeStrip(); submit(`${word} ${a.word} ${join} ${b.word}`.replace(/ {2,}/g, ' ')); });
+    });
+  }
+  function buildPad() {
+    for (const [label, dir] of [['NW', 'nw'], ['N', 'n'], ['NE', 'ne'], ['W', 'w'], ['LOOK', 'look'], ['E', 'e'], ['SW', 'sw'], ['S', 's'], ['SE', 'se'], ['UP', 'u'], ['DN', 'd'], ['TYPE', null]]) {
+      const b = chip(label, dir ? () => submit(dir) : () => cmd.focus());
+      if (dir && dir !== 'look') b.dataset.dir = dir;
+      b.setAttribute('aria-label', dir === 'look' ? 'look around' : dir ? 'go ' + dir : 'open the keyboard');
+      $('dpad').append(b);
+    }
+    for (const v of VERBS) { const b = chip(v[0], null); b.addEventListener('click', () => verbTap(v, b)); $('verbs').append(b); }
+  }
+  function updatePad() {
+    if (!mobile) return;
+    const ex = new Set(context().exits.map(e => e.dir));
+    for (const b of document.querySelectorAll('#dpad [data-dir]')) b.classList.toggle('off', !ex.has(b.dataset.dir));
+  }
+  pad.addEventListener('mousedown', e => e.preventDefault()); // tapping a button must not close the keyboard
+  log.addEventListener('click', e => { const t = e.target.closest && e.target.closest('.cmdline'); if (t && !busy) submit(t.dataset.cmd); }); // tap an old command to repeat it
+  buildPad();
 
   cmd.addEventListener('keydown', e => {
     if (busy) { skip = true; e.preventDefault(); return; }
     if (e.key === 'Enter') { const v = cmd.value; cmd.value = ''; typed.textContent = ''; if (v.trim()) { hist.push(v); hi = hist.length; } submit(v); }
     else if (e.key === 'ArrowUp') { if (hi > 0) { cmd.value = hist[--hi]; typed.textContent = cmd.value; } e.preventDefault(); }
-    else if (e.key === 'ArrowDown') { if (hi < hist.length - 1) cmd.value = hist[++hi]; else { hi = hist.length; cmd.value = ''; } typed.textContent = cmd.value; e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { cmd.value = hi < hist.length - 1 ? hist[++hi] : ''; hi = Math.min(hi + 1, hist.length); typed.textContent = cmd.value; e.preventDefault(); }
   });
-  cmd.addEventListener('input', () => { typed.textContent = cmd.value; });
-  addEventListener('mousedown', () => { wasOn = powered; if (!powered) return powerOn(); if (busy) skip = true; setTimeout(() => cmd.focus(), 0); });
-  addEventListener('keydown', e => { if (!powered) { if (e.key !== 'F11') powerOn(); return; } cmd.focus(); });
+  cmd.addEventListener('input', () => { if (busy) cmd.value = ''; typed.textContent = cmd.value; });
+  addEventListener('mousedown', () => { wasOn = powered; if (!powered) return powerOn(); if (busy) skip = true; if (!mobile) setTimeout(() => cmd.focus(), 0); });
+  addEventListener('keydown', e => { if (!powered) { if (e.key !== 'F11') powerOn(); return; } if (busy) skip = true; if (!mobile) cmd.focus(); });
   $('power').addEventListener('click', () => { if (wasOn) location.reload(); }); // power button restarts once on
 
   // Browsers only allow full screen after a click or key press, so the screen starts "off" and powering on does both.
@@ -171,6 +312,7 @@
     else { const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; try { const p = f && f.call(d); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
     boot(start());
   }
+  applyMode();
 </script>
 </body>
 </html>

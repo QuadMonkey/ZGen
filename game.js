@@ -194,13 +194,13 @@ const items = {
   knife: { n: 'a kitchen knife', al: 'knife kitchen blade', at: 'kitchen', lst: 'A kitchen knife is in the dish rack.', wp: { msg: 'You jab the knife into the zombie\'s skull, hard. It drops, but not before it grabs you.', risk: 1 }, d: 'A sharp chef\'s knife. Close-quarters, risky.',
     on: { tape: () => makeSpear() } },
   tv: { n: 'the TV', al: 'tv television news screen', at: 'living', lst: '', fixed: 1, d: 'A big flat-screen TV, currently off.',
-    on: { switchon: () => { if (!S.f.power) return 'You press the power button. Nothing. The power is out.'; aw('tv', 3); return 'The TV blinks on mid-sentence. A news anchor with a crooked tie is reading from paper, because the teleprompter has died: "- repeat, a Level Five contagion event is in progress in Millbrook County. Remain indoors. Do not approach anyone showing signs of aggression, fever, or an unusual gait. A map flashes with three glowing pins: PIER 9 HARBOR, MOUNT KESTREL, FORT MARROW AIRFIELD. Evacuation passes have been pushed to all phones in the county." The anchor looks off-camera, goes pale, and the feed cuts to a test pattern.'; }, switchoff: () => 'You switch it off. The silence is worse.', use: () => 'Try TURN ON TV.' } },
+    on: { switchon: () => { if (!S.f.power) return 'You press the power button. Nothing. The power is out.'; aw('tv', 3); return 'The TV blinks on mid-sentence. A news anchor with a crooked tie is reading from paper, because the teleprompter has died: "- repeat, a Level Five contagion event is in progress in Millbrook County. Remain indoors. Do not approach anyone showing signs of aggression, fever, or an unusual gait. A map flashes with three glowing pins: PIER 9 HARBOR, MOUNT KESTREL, FORT MARROW AIRFIELD. Evacuation passes have been pushed to all phones in the county." The anchor looks off-camera, goes pale, and the feed cuts to a test pattern.'; }, switchoff: () => 'You switch it off. The silence is worse.', use: () => items.tv.on.switchon() } },
   couch: { n: 'the couch', al: 'couch sofa', at: 'living', lst: '', fixed: 1, d: 'A large, deep couch that has seen too many movie marathons. It looks heavy enough to block a door.',
-    on: { push: () => barricade(), pull: () => { if (!S.f.barricade) return 'It is already where it belongs.'; S.f.barricade = 0; return 'You drag the couch back across the floor. The front door is accessible again.'; } } },
+    on: { use: () => barricade(), push: () => barricade(), pull: () => { if (!S.f.barricade) return 'It is already where it belongs.'; S.f.barricade = 0; return 'You drag the couch back across the floor. The front door is accessible again.'; } } },
   frontdoor: { n: 'the front door', al: 'door front', at: 'living', lst: '', fixed: 1, d: 'Your front door. The deadbolt is thrown back, and it opens south into the front yard. Locks do not mean much right now.', on: { push: () => barricade(), open: () => 'It is already unlocked. You can go south.' } },
   bat: { n: 'a baseball bat', al: 'bat baseball aluminum club', at: 'garage', lst: 'A baseball bat leans against the wall.', pts: ['weapon', 3], wp: { msg: 'You swing the bat with everything you have. The zombie\'s head snaps sideways and it goes down. Quiet again.' }, d: 'A dented aluminium bat, bruised from many seasons of Little League. Reassuringly heavy.' },
   toolbox: { n: 'a toolbox', al: 'toolbox box tool tools', at: 'garage', lst: 'A red toolbox sits on the workbench.', fixed: 1, cont: 1, d: 'A dented red metal toolbox with a rusty latch.' },
-  crowbar: { n: 'a crowbar', al: 'crowbar pry bar', at: 'in:toolbox', pts: ['crowbar', 2], wp: { msg: 'You bring the crowbar down hard on the zombie. It stops moving.' }, d: 'A heavy steel crowbar. Good for prying open things. Or skulls.', on: { use: () => 'Try PRY something WITH the crowbar, or ATTACK a zombie with it.' } },
+  crowbar: { n: 'a crowbar', al: 'crowbar pry bar', at: 'in:toolbox', pts: ['crowbar', 2], wp: { msg: 'You bring the crowbar down hard on the zombie. It stops moving.' }, d: 'A heavy steel crowbar. Good for prying open things. Or skulls.', on: { use: () => { const d = ['edoor', 'rdoor'].find(vis); return d ? items[d].on.pry() : 'Nothing here needs prying. (You can also ATTACK a zombie with it.)'; } } },
   mailbox: { n: 'the mailbox', al: 'mailbox mail box', at: 'front_yard', lst: '', fixed: 1, cont: 1, d: 'A small mailbox with a flag. The flag is up.' },
   leaflet: { n: 'a leaflet', al: 'leaflet pamphlet flyer brochure paper', at: 'in:mailbox', read: 1, pts: ['leaflet', 2],
     d: 'COUNTY OFFICE OF EMERGENCY PREPAREDNESS - "BE READY, MILLBROOK!" In the event of a Level Five emergency, three shelters will open:\n  1. HAVEN ISLAND (via Pier 9 Harbor) - ferry service. Your phone will receive a digital boarding pass.\n  2. BUNKER HALCYON, Mount Kestrel - entrance through the old mine tunnel. Park rangers hold the access codes.\n  3. FORT MARROW AIRFIELD - helicopter extraction. Signal with a flare at the helipad.\nPlease do not call the number on this leaflet; it is not staffed and never was.' },
@@ -216,7 +216,7 @@ const items = {
   bandage: { n: 'a box of adhesive bandages', al: 'bandage bandages bandaid box adhesive', at: 'pharmacy', lst: 'A box of adhesive bandages is on the floor.', d: 'A box of adhesive bandages. Enough for one patch job.', on: { use: () => healKit('bandage', 1) } },
   pills: { n: "Mrs. Alvarez's prescription bag", al: 'pills bag prescription alvarez medicine digoxin', at: 'pharmacy', lst: 'A paper bag on the pickup shelf is stapled shut and labelled ALVAREZ, ROSA.', pts: ['pills', 3], d: 'A white paper bag stapled shut: ALVAREZ, ROSA - DIGOXIN, 0.125MG. Heart medication, taken daily. Mrs. Alvarez from the end of the street.' },
   hammer: { n: 'a claw hammer', al: 'hammer claw', at: 'hardware', lst: 'A claw hammer hangs on the pegboard.', pts: ['weapon', 3], wp: { msg: 'You bring the hammer down on the zombie. It stops moving.' }, d: 'A solid claw hammer. Better than nothing.' },
-  cutters: { n: 'a pair of bolt cutters', al: 'bolt cutters boltcutters cutters', at: 'hardware', lst: 'A pair of bolt cutters hangs on the pegboard.', pts: ['cutters', 2], d: 'Heavy-duty bolt cutters with red rubber handles. For when a padlock stands between you and the future.', on: { use: () => 'Try CUT something WITH the bolt cutters.' } },
+  cutters: { n: 'a pair of bolt cutters', al: 'bolt cutters boltcutters cutters', at: 'hardware', lst: 'A pair of bolt cutters hangs on the pegboard.', pts: ['cutters', 2], d: 'Heavy-duty bolt cutters with red rubber handles. For when a padlock stands between you and the future.', on: { use: () => vis('chain') ? items.chain.on.cut() : 'There is nothing here to cut.' } },
   latte: { n: 'a cold oat latte', al: 'latte coffee oat cup', at: 'cafe', lst: 'A cold oat latte sits on a table.', eat: 'Lukewarm, over-sweet, and absolutely worth it. A small win in a bad week.', d: 'An oat milk latte, half-finished, with heart latte art long gone.' },
   nightstick: { n: 'a nightstick', al: 'nightstick baton club', at: 'police', lst: 'A nightstick lies on the front desk.', pts: ['weapon', 3], wp: { msg: 'You crack the nightstick across the zombie\'s skull. It drops.' }, d: 'A standard-issue police baton. Solid, and comforting to hold.' },
   flaregun: { n: 'a flare gun', al: 'flare gun flaregun signal', at: 'evidence', lst: 'A bright orange flare gun sits in an evidence bag tagged "EXHIBIT 14B: SPRING BREAK, PIER 9".', pts: ['flare', 4], d: 'A bright orange flare gun, already loaded. Evidence tag: "Exhibit 14B". It will definitely be used for evidence, in a sense.',
@@ -249,7 +249,7 @@ const items = {
     d: 'A heavy Millbrook PD badge, the name plate reading D. DELGADO. The pin is bent, like it was pulled at.' },
   coins: { n: 'a handful of pennies', al: 'pennies coins change cents', at: 'mall', lst: 'A few pennies glint in the fountain.',
     d: 'A fistful of fountain pennies, each one a wish somebody made. You are now the custodian of several wishes.',
-    on: { put: b => b && b.id === 'machine' ? playMachine() : undefined } },
+    on: { put: b => b && b.id === 'machine' ? playMachine() : undefined, use: () => vis('machine') ? playMachine() : 'You need something to put them in.' } },
   machine: { n: 'an arcade cabinet', al: 'machine game arcadecabinet', at: 'arcade', lst: '', fixed: 1,
     d: () => S.f.power ? 'GALAXY WARP, a cabinet older than you. The screen blinks INSERT COIN. The high score belongs to ASS.' : 'GALAXY WARP, a cabinet older than you. The screen is dead black. The high score, wherever it is, still belongs to ASS.',
     on: { use: () => 'The coin slot stares back at you. It wants a coin. (PUT COINS IN MACHINE.)' } },
@@ -261,7 +261,7 @@ const items = {
     d: 'A kitchen knife taped to a length of steel pipe with heroic amounts of duct tape. Range: better than hugging.' },
   guard: { n: 'the guard', al: 'guard officer man soldier', at: 'pier_gate', lst: '', fixed: 1, d: 'A tired man in a hi-vis vest, a rifle slung over his shoulder and a tablet scanner in one hand. He is polite in the way of someone who has been told not to shoot anybody unless necessary.',
     on: { talk: () => S.f.gate ? '"Go on through, kid. Mind the gangway."' : '"Boarding pass. Show me your phone. No pass, no boat. I wish I could do otherwise."', give: b => guardShow(b) } },
-  boat: { n: 'the ferry', al: 'boat ferry ship sea haven', at: 'pier', lst: '', fixed: 1, go: 'END_DOCK', d: 'A white ferry with a red stripe. SEA HAVEN, in neat black letters. Its deck rail is crowded with tired faces.' },
+  boat: { n: 'the ferry', al: 'boat ferry ship sea haven', at: 'pier', lst: '', fixed: 1, go: 'END_DOCK', on: { use: () => win('END_DOCK') }, d: 'A white ferry with a red stripe. SEA HAVEN, in neat black letters. Its deck rail is crowded with tired faces.' },
   logbook: { n: "the ranger's logbook", al: 'logbook log book ranger ledger', at: 'ranger', lst: "A ranger's logbook lies open on the desk.", read: 1, pts: ['log', 3],
     d: 'The final entry, in shaky capitals: "H. ALVAREZ, CHIEF RANGER. If you are reading this you found the station. HALCYON GATE: swipe the staff keycard (I left it on the desk, next to this book) and enter code 6174 on the keypad. The tunnel is dark - bring a light. God help us all."' },
   keycard: { n: 'a Halcyon keycard', al: 'keycard card halcyon staff', at: 'ranger', lst: 'A green HALCYON keycard sits on the desk.', pts: ['card', 3], d: 'A green plastic card with a gold chip. HALCYON PROJECT - STAFF ACCESS. A bird logo.',
@@ -511,6 +511,20 @@ function find(ph) {
   for (const [k, v] of Object.entries(GL)) if (k.split(' ').includes(word)) return { scn: v, fixed: 1, name: ph };
   say(`You can't see any ${ph} here.`); return null;
 }
+// What a UI can offer right now: exits, and every visible item with the single word that reliably names it.
+function context() {
+  if (!S || S.over) return { exits: [], items: [], zombies: 0, over: true };
+  const blind = rooms[S.room].dark && !lit();
+  const seen = id => vis(id) && !(blind && !carried(id));
+  const resolve = w => Object.keys(items).find(id => seen(id) && items[id].al.split(' ').includes(w));
+  const wordFor = id => { const it = items[id], last = it.n.split(' ').pop().toLowerCase().replace(/[^a-z0-9]/g, ''); return [last, ...it.al.split(' ')].find(w => !ZW.has(w) && resolve(w) === id); };
+  const list = Object.keys(items).filter(seen).map(id => {
+    const it = items[id], word = wordFor(id), on = it.on || {};
+    return word && { id, word, carried: carried(id), fixed: !!it.fixed, cont: !!it.cont, open: isOpen(id), read: !!it.read, npc: !!on.talk, openable: !!on.open, usable: !!(on.use || it.eat || it.wear) };
+  }).filter(Boolean);
+  const exits = Object.keys(rooms[S.room].x).filter(d => DNAME[d]).map(d => ({ dir: d, word: DNAME[d] }));
+  return { exits, items: list, zombies: S.z[S.room] || 0, blind, over: false };
+}
 const V = {};
 const def = (names, fn, free) => names.split(' ').forEach(n => (V[n] = { fn, free }));
 const PH = [[/^pick up (.+)/, 'take $1'], [/^pick (.+) up$/, 'take $1'], [/^put down (.+)/, 'drop $1'], [/^put (.+) down$/, 'drop $1'],
@@ -644,6 +658,8 @@ def('use', (a, b, P) => {
   if (!a) return say('Use what?');
   if (a.wp) return say('Try ATTACK something with it.');
   if (a.zombie || a.scn) return say("You can't use that.");
+  if (a.eat) return V.eat.fn(a, b, P);
+  if (a.wear) return V.wear.fn(a, b, P);
   say("You're not sure how to use that.");
 });
 def('switchon', (a, b, P) => { if (!a) return say('Turn on what?'); say("You can't turn that on."); });
@@ -741,6 +757,7 @@ def('verbose', () => { S.verbose = 1; say('Verbose mode. Full room descriptions 
 def('brief', () => { S.verbose = 0; say('Brief mode. Full descriptions only the first time.'); }, 1);
 def('save', () => { try { localStorage.setItem('zgen', JSON.stringify(S)); say('Saved.'); } catch (e) { say('Saving failed (browser storage unavailable).'); } }, 1);
 def('restore load', () => { try { const s = localStorage.getItem('zgen'); if (!s) return say('No saved game found.'); S = JSON.parse(s); say('Restored.'); describe(true); } catch (e) { say('Restore failed.'); } }, 1);
+def('continue', () => { try { const s = localStorage.getItem('zgen-auto'); if (!s) return say('No autosaved game found.'); S = JSON.parse(s); say('Resuming your game.\n'); describe(true); } catch (e) { say('Could not resume.'); } }, 1);
 def('restart', () => { init(); describeStart(); }, 1);
 def('quit q', () => { say(`Your score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\nType RESTART to play again.`); S.over = 'quit'; }, 1);
 def('help ?', () => say('ZGEN is a text adventure. You type commands; the game answers.\n\n  Move:      N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT\n  Look:      LOOK, EXAMINE <thing>, READ <thing>, SEARCH <thing>\n  Things:    TAKE, DROP, OPEN, CLOSE, PUT <x> IN <y>, WEAR, EAT, USE\n  Phone:     CHECK PHONE, TURN ON/OFF PHONE, PLUG PHONE INTO CHARGER\n  Fight:     ATTACK ZOMBIE WITH <weapon>\n  Others:    TALK, GIVE <x> TO <y>, SHOW <x> TO <y>, THROW <x> <direction>\n  Meta:      INVENTORY (I), SCORE, DIAGNOSE, SAVE, RESTORE, RESTART, QUIT, HINT\n\nTIPS: Your phone is your light and your boarding pass. Watch the battery.\nZombies get one free move on you. After that, they bite. Leave, or fight.'), 1);
@@ -763,4 +780,4 @@ function describeStart() {
 }
 function status() { const r = rooms[S.room]; return { room: r.dark && !lit() ? 'Darkness' : r.name, score: S.score, moves: S.moves, max: MAX }; }
 function start() { init(); out = []; describeStart(); return out.join('\n'); }
-if (typeof module !== 'undefined') module.exports = { start, run, status, get S() { return S; } };
+if (typeof module !== 'undefined') module.exports = { start, run, status, context, get S() { return S; } };

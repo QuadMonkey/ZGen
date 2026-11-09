@@ -40,6 +40,19 @@ There is nothing to install and no build step. Open `index.html` in a web browse
 - The monitor's **POWER** button restarts the game.
 - Add `?skip` to the address (`index.html?skip`) to skip the boot sequence.
 
+### On a phone
+
+On a phone the cabinet disappears and the CRT picture fills the screen. You do not have to type:
+
+- **Direction buttons** on the left. Only the directions that really exist from where you are are lit.
+- **Verb buttons** on the right (`TAKE`, `DROP`, `EXAM`, `READ`, `OPEN`, `USE`, `TALK`, `GIVE`, `ATTK`, `THRW`, `PUT`, `WAIT`, `INV`, `HINT`, `SCOR`).
+  Tap a verb and a strip shows the things in the room you can use it on. Tap one to do it.
+- **TYPE** opens the keyboard when you need to type something specific. While it is open the buttons tuck away so the
+  story has room. Tapping the `>` line opens it too.
+- Tap any earlier `>` command in the story to repeat it. **AA** changes the text size.
+- The game **autosaves** whenever you leave the tab. If your browser throws the tab away, type `continue` to resume.
+- The bunker keypad needs the keyboard, because you have to type the four-digit code.
+
 ## How to play
 
 You type short commands and the game answers, the way text adventures always have. Try things. Nothing is
@@ -65,7 +78,7 @@ off limits, and the game will tell you when it does not understand.
 | Tools | `pry <x> with <y>`, `cut <x> with <y>`, `unlock <x> with <y>`, `push <x>`, `throw <x> <direction>`, `tape <x>` |
 | Game | `inventory` (or `i`), `score`, `diagnose`, `hint`, `save`, `restore`, `restart`, `quit`, `verbose`, `brief`, `again` (or `g`) |
 
-`save` stores your game in your browser, so it lasts until you clear your site data.
+`save` stores your game in your browser, so it lasts until you clear your site data. `continue` resumes the autosave.
 
 ## How survival works
 
@@ -160,7 +173,8 @@ helping people along the way and doing a few things before the power goes out.
 
 - `game.js`: the whole game. World data (rooms, items, events, endings) is at the top, and the parser and verbs
   are below.
-- `index.html`: the monitor, the screen effects and the boot sequence.
+- `index.html`: the monitor, the screen effects, the boot sequence and the phone layout. Add `?mobile` to the address
+  to force the phone layout on a desktop browser.
 - `test.js`: run `node test.js` to replay all three endings, the side quests, and a perfect 125-point run.
 
 ## Licence

@@ -84,3 +84,31 @@ console.log('parser/continuity checks ok');
 g.start(); g.S.room = 'riverside'; g.S.at.backpack = 'inv'; g.S.at.speaker = 'in:backpack';
 assert(g.run('throw speaker north').includes('clatters into'), 'throw from the backpack');
 console.log('throw-from-backpack ok');
+
+// -- phone support: the tap buttons rely on context() and on "use" doing the obvious thing
+{
+  g.start(); g.S.at.phone = 'inv'; // a lit phone, so dark rooms are not blind
+  const lone = Object.keys(g.S.at).filter(id => g.S.at[id] !== 'inv' && g.S.at[id] !== 'worn' && !String(g.S.at[id]).startsWith('in:') && g.S.at[id] !== 'nowhere' && id !== 'phone');
+  for (const id of lone) {
+    g.S.room = g.S.at[id];
+    const entry = g.context().items.find(i => i.id === id);
+    assert(entry, `context() offers no button word for "${id}" in ${g.S.room}`);
+    assert(!g.run('examine ' + entry.word).includes("can't see"), `button word "${entry.word}" for "${id}" is not understood`);
+    g.S.at.phone = 'inv'; g.S.room = g.S.at[id];
+  }
+  assert.strictEqual(lone.length > 30, true, 'expected to check dozens of items');
+  console.log('context() words ok for', lone.length, 'items');
+
+  g.start(); assert.deepStrictEqual(g.context().exits.map(e => e.dir), ['e'], 'bedroom has one exit');
+  g.S.room = 'police'; g.S.at.crowbar = 'inv'; assert(g.run('use crowbar').includes('lock shrieks'), 'use crowbar should pry the evidence door');
+  g.S.room = 'afgate'; g.S.at.cutters = 'inv'; assert(g.run('use bolt cutters').includes('CLANG'), 'use cutters should cut the chain');
+  g.S.room = 'living'; assert(g.run('use couch').includes('shove the couch'), 'use couch should barricade');
+  g.S.at.drink = 'inv'; assert(g.run('use energy drink').includes('heart does a drum solo'), 'use on food should eat it');
+  g.S.room = 'pier'; assert(g.run('use ferry').includes('HAVEN ISLAND'), 'use ferry should board it');
+  // autosave resume
+  const store = {}; global.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: k => delete store[k] };
+  g.start(); assert(g.run('continue').includes('No autosaved'), 'nothing to resume yet');
+  g.run('e'); store['zgen-auto'] = JSON.stringify(g.S); g.start(); assert(g.run('continue').includes('Resuming') && g.S.room === 'hall', 'continue should restore the saved room');
+  delete global.localStorage;
+  console.log('phone-support checks ok');
+}
