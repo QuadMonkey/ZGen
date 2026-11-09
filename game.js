@@ -7,7 +7,7 @@ const ZW = new Set('zombie zombies walker walkers undead horde crowd soldiers dr
 const ZOMBIE = { id: 'zombie', name: 'zombie', zombie: true };
 let S, out, tags, ctx = '', pending = null; // pending: a yes/no question waiting for an answer
 // Routine confirmations recede (shown dim); everything else is plain unless the caller labels it.
-const DIM = /^(.+: )?(Taken|Dropped|Done|Closed|Removed|Opened)\.|^(You can't|You don't|You already|You are carrying too much|You are not wearing|There is nothing here|There are no zombies|I don't know the word|Time passes|It is already|Nobody answers|That won't budge|Which direction|Take what|Drop what|Open what|Read what|Put what|Use what|Talk to whom)/;
+const DIM = /^(.+: )?(Taken|Dropped|Done|Closed|Removed|Opened)\.|^(You can't|You don't|You already|You are carrying too much|You are not wearing|There is nothing here|There are no zombies|I don't know the word|You wait\.|It is already|Nobody answers|That won't budge|Which direction|Take what|Drop what|Open what|Read what|Put what|Use what|Talk to whom)/;
 const ask = (q, yes) => { pending = yes; say(q, 'hint'); };
 const say = (s, c) => { tags.push(c || ctx || (DIM.test(s) ? 'dim' : '')); return out.push(s); };
 const aw = (k, p) => { if (!S.f['s_' + k]) { S.f['s_' + k] = 1; S.score += p; } };
@@ -25,13 +25,20 @@ const charging = () => !!(S.f.plugged && S.f.power && S.at.phone === S.f.plugged
 const lit = () => !!(S.f.phone_on && S.bat > 0 && vis('phone'));
 const phoneTime = () => { const m = 400 + S.moves * 2, h = Math.floor(m / 60) % 24; return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; };
 
+const TEXTS = [ // [move it arrives, line]
+  [0, '  Dani (6:31 AM): "anyone elses feed completely cooked rn??"'],
+  [10, '  Dani (6:52 AM): "bro my neighbor just BIT the mailman. this is not a bit."'],
+  [10, '  Kai (6:55 AM): "ok but why is everyone walking like that"'],
+  [30, '  Dani (7:38 AM): "im ok. locked in my uncles garage. DO NOT go outside. group chat is chaos"'],
+  [45, '  Kai (8:07 AM): "is the wifi down for anyone else??"'],
+  [45, '  You to Dani (8:09 AM): "where are you" [Not Delivered]']
+];
 function phoneScreen() {
   if (!S.f.phone_on) return 'The screen is black. (TURN ON PHONE.)';
   let t = `Lock screen: ${phoneTime()}.  Battery: ${S.bat}%${charging() ? ' (charging)' : ''}.\n`;
   t += '\nMESSAGES\n  Mom (5:12 AM): "They called me in early. The hospital is chaos, something is going around. Lock the door and stay home. I will call you. Eat something."\n';
-  if (S.moves < 10) t += '  Dani (6:31 AM): "anyone elses feed completely cooked rn??"\n';
-  else if (S.moves < 40) t += '  Dani (6:52 AM): "bro my neighbor just BIT the mailman. this is not a bit."\n  Kai (6:55 AM): "ok but why is everyone walking like that"\n';
-  else t += '  Dani (7:20 AM): "[Not Delivered]"\n  Kai (7:22 AM): "[Not Delivered]"\n  Group chat "The Girlies and Kevin": 212 unread.\n';
+  t += TEXTS.filter(x => S.moves >= x[0]).map(x => x[1] + '\n').join('');
+  if (S.moves >= 30) t += `  Group chat "The Girlies and Kevin": 212 unread.${S.moves >= 70 ? ' Nobody has posted for almost an hour.' : ''}\n`;
   if (S.f.alert) {
     S.f.pass = 1;
     t += '\nEMERGENCY ALERT - MILLBROOK COUNTY\n  A Level Five contagion outbreak is underway. Do not approach infected persons. Do NOT go to the hospital.\n  Government evacuation sites are open to all civilians:\n' +
@@ -97,14 +104,14 @@ const rooms = {
     desc: 'The station lobby is ransacked: overturned chairs, a front desk, and a bulletin board of faded notices. A stairwell leads down to the evidence room. The square is west.',
     scn: { 'desk front': 'The sergeant\'s coffee is still warm. That is concerning.', 'board bulletin notices': 'MISSING: tabby cat "Biscuit"? No, wait, that\'s a dog. A different dog. The handwriting is shaky.', 'stairs stairwell': 'The stairs go down to a steel door.' } },
   evidence: { name: 'Evidence Room', dark: 1, x: { u: 'police' },
-    desc: 'Rows of metal shelves, evidence bags, and labelled boxes. Everything the Millbrook PD ever confiscated is down here, mostly illegal fireworks. The stairs go up.',
-    scn: { 'shelves shelf boxes bags': 'Labelled evidence bags. Mostly illegal fireworks, a lot of vapes, and a flare gun case in the corner.' } },
+    desc: 'Rows of metal shelves, evidence bags, and labeled boxes. Everything the Millbrook PD ever confiscated is down here, mostly illegal fireworks. The stairs go up.',
+    scn: { 'shelves shelf boxes bags': 'Labeled evidence bags. Mostly illegal fireworks, a lot of vapes, and a flare gun case in the corner.' } },
   hospital: { name: "St. Brigid's Hospital Lobby", x: { n: 'square', e: 'staff', w: 'ward' },
     desc: 'The sliding doors are stuck open. Overturned gurneys, scattered clipboards, and a lot of dark stains on the white floor. A sign points east to STAFF ONLY, and the ward wing is west. The square is north.',
     scn: { 'gurney gurneys gurneys': 'Empty, and not by choice.', 'clipboards clipboard': 'Patient notes: "fever, aggression, tried to bite triage nurse." That last one is underlined.', 'sign': 'STAFF ONLY, with an arrow east.', 'stains stain floor': 'You look away.' } },
   staff: { name: 'Nurses\' Staff Room', outlet: 1, x: { w: 'hospital', out: 'hospital' },
     desc: 'A break room with a mini-fridge, a corkboard, and a row of lockers. One locker has your mom\'s name on it, in her handwriting. The lobby is west.',
-    scn: { 'fridge': 'Someone\'s lunch has a label: "DO NOT TOUCH, DEBRA".', 'corkboard board': 'Staff roster, a flyer for a pizza party. "Mandatory fun."', 'lockers': 'A row of grey lockers. Your mom\'s is easy to spot: it has a sticker of you at age six.' } },
+    scn: { 'fridge': 'Someone\'s lunch has a label: "DO NOT TOUCH, DEBRA".', 'corkboard board': 'Staff roster, a flyer for a pizza party. "Mandatory fun."', 'lockers': 'A row of gray lockers. Your mom\'s is easy to spot: it has a sticker of you at age six.' } },
   ward: { name: "St. Brigid's Ward", x: { e: 'hospital' },
     desc: 'A long ward of curtained beds, most of them empty, one of them very much not. Charts hang from rails, an IV stand lies on its side, and the lights buzz at half strength. The lobby is east.',
     scn: { 'beds bed curtains curtain': 'You check the occupied bed from a safe distance. Then you stop checking.', 'charts chart': 'Every chart ends with the same underlined word: BITTEN.', 'iv stand': 'The bag is long empty.', 'figure body delgado': 'A man in a police uniform, half out of bed, very still. His badge is missing; it must have fallen.' } },
@@ -113,7 +120,7 @@ const rooms = {
     scn: { 'fountain pennies': 'Full of wishes. None of them came true.', 'escalator': 'Frozen mid-ride. Nobody is on it.', 'stroller': 'Empty. You decide not to think about it.', 'skylights skylight': 'Bright. It does not match the mood.' } },
   electronics: { name: 'Zap! Electronics', outlet: 1, x: { w: 'mall', out: 'mall' },
     desc: () => (S.f.power ? 'Walls of TVs, all showing the same emergency broadcast on a dozen different brands.' : 'Walls of dead TVs, each reflecting your own tired face.') + ' A demo table displays gadgets. The mall atrium is west.',
-    scn: { 'tvs tv television': () => S.f.power ? 'The same newscaster, in a dozen different colour profiles. She has stopped blinking.' : 'Dark screens. You can see yourself in them, which is worse.', 'table demo gadgets': 'Smartwatches, earbuds, drones, and one extremely loud speaker.' } },
+    scn: { 'tvs tv television': () => S.f.power ? 'The same newscaster, in a dozen different color profiles. She has stopped blinking.' : 'Dark screens. You can see yourself in them, which is worse.', 'table demo gadgets': 'Smartwatches, earbuds, drones, and one extremely loud speaker.' } },
   sports: { name: 'Sports Depot', x: { e: 'mall', out: 'mall' },
     desc: 'Aisles of team jerseys, treadmills, and camping gear. A wall of hockey sticks and baseball bats lines the back. The mall atrium is east.',
     scn: { 'jerseys jersey': 'Sizes S through XXL. All sold out of anything fashionable.', 'treadmill treadmills': 'Nobody is running. That is the problem.', 'camping gear tents': 'A display tent with a sign: "FOR THE ADVENTURER IN YOU". Okay.' } },
@@ -136,17 +143,17 @@ const rooms = {
     desc: 'A steel gate topped with razor wire guards the entrance to Pier 9. A grim-faced guard in a hi-vis vest watches from behind a barrier, a clipboard in one hand and a rifle slung over his shoulder. Beyond the gate you can see the pier, and a white ferry waiting. Harbor Road is west.',
     scn: { 'gate fence wire barrier': () => S.f.gate ? 'The gate is open. Beyond it, the pier.' : 'A heavy steel gate with razor wire. Behind it, the pier and the boat.', 'ferry boat pier': 'You can see it from here: a white ferry with a red stripe, engines idling.', 'clipboard': 'A manifest of names. Yours is not on it. Yet.' } },
   pier: { name: 'Pier 9', x: { w: 'pier_gate' },
-    desc: 'A long wooden pier stretches into the grey water. A white ferry, the SEA HAVEN, idles at the end. Weary survivors sit on duffel bags, and a deckhand waves people up a gangway. The gate is west.',
+    desc: 'A long wooden pier stretches into the gray water. A white ferry, the SEA HAVEN, idles at the end. Weary survivors sit on duffel bags, and a deckhand waves people up a gangway. The gate is west.',
     scn: { 'survivors people crowd': 'Maybe fifty people, quiet and exhausted. Some are crying. Some are asleep standing up.', 'gangway deckhand': 'A deckhand in an orange vest, ticking names off a list. "Keep it moving," he says, gently.', 'water': 'Cold and dark. The far shore is just a smudge.' } },
   park: { name: 'Greenwood Park', x: { se: 'square', n: 'trailhead', e: 'pond' },
     desc: 'A big, shady park with a playground, picnic tables, and a duck pond to the east. A trail leads north toward Mount Kestrel. A road goes southeast to the town square.',
     scn: { 'playground swings swing slide': 'The swings are still moving, slightly.', 'pond ducks duck': 'The ducks are gone. Or avoiding the topic.', 'tables picnic': 'A picnic abandoned mid-meal. A sandwich with one bite.' } },
   pond: { name: 'Duck Pond', x: { w: 'park' },
-    desc: 'A scummy pond with a leaning bench and a shopping trolley poking out of the water like a shipwreck. No ducks. The park is west.',
+    desc: 'A scummy pond with a leaning bench and a shopping cart poking out of the water like a shipwreck. No ducks. The park is west.',
     scn: { 'trolley cart': 'Every pond has one. Nobody knows how. Nobody ever will.', 'bench': 'A plaque reads: IN MEMORY OF GERALD, WHO FED THE DUCKS. Gerald is not here either.', 'water ducks duck': 'Something ripples once, far out. You decide it was a fish.' } },
   trailhead: { name: 'Kestrel Trailhead', x: { s: 'park', n: 'switchback' },
-    desc: 'A gravel lot and a wooden signboard where the trail begins. Mount Kestrel looms to the north, grey rock and dark pine. The park is south.',
-    scn: { 'sign signboard board map': 'KESTREL TRAIL - RANGER STATION 1.2 MI. Someone has added: "HALCYON, GO LEFT AT THE MINE" in marker, and then thought better of it and scribbled it out.', 'mountain mount kestrel': 'Grey, forested, and quiet. A good place to hide.' } },
+    desc: 'A gravel lot and a wooden signboard where the trail begins. Mount Kestrel looms to the north, gray rock and dark pine. The park is south.',
+    scn: { 'sign signboard board map': 'KESTREL TRAIL - RANGER STATION 1.2 MI. Someone has added: "HALCYON, GO LEFT AT THE MINE" in marker, and then thought better of it and scribbled it out.', 'mountain mount kestrel': 'Gray, forested, and quiet. A good place to hide.' } },
   switchback: { name: 'Switchback Trail', x: { s: 'trailhead', e: 'lookout', n: () => S.f.ranger ? 'ranger' : 'The Ranger Station door at the top of the trail is locked, a heavy dead-bolt.' },
     desc: 'The trail zigzags up the mountainside through dark pines. At the top stands a stout log building with a green roof: the Ranger Station. A weathered sign hangs on its door. A wooden lookout platform juts from the slope to the east. The trailhead is south.',
     scn: { 'pines trees pine': 'Tall, dark, and quiet. You can almost hear the mountain breathing.', 'building station roof': 'A log cabin with a green roof, the Ranger Station. Its door is shut.' } },
@@ -154,17 +161,17 @@ const rooms = {
     desc: 'A wooden platform above the treeline with a coin-op telescope and a view of all of Millbrook: the river, the mall, and thin smoke rising in three places. The trail is west.',
     scn: { 'telescope': 'It wants a dollar. You look anyway, because the apocalypse has loosened its coin mechanism. The town looks small and quiet, which is somehow worse.', 'view town smoke': 'Three columns of smoke: downtown, the hospital, and somewhere near your street.' } },
   ranger: { name: 'Ranger Station', outlet: 1, x: { s: 'switchback', n: 'mine' },
-    desc: 'A cosy cabin with a woodstove, a wall map of Mount Kestrel, and a gun rack, empty. A desk sits under the window. A dark doorway leads north into the old mine tunnel. The door south leads back to the trail.',
-    scn: { 'map wall': 'Mount Kestrel, hand-drawn: trails, the old Kestrel Mine, and a mark labelled "H" deep in the mountain, circled twice.', 'stove woodstove': 'Cold. Nobody has been here in days.', 'desk window': 'Neatly organised. The ranger was a tidy person.', 'rack gun': 'Empty. They took it with them.' } },
+    desc: 'A cozy cabin with a woodstove, a wall map of Mount Kestrel, and a gun rack, empty. A desk sits under the window. A dark doorway leads north into the old mine tunnel. The door south leads back to the trail.',
+    scn: { 'map wall': 'Mount Kestrel, hand-drawn: trails, the old Kestrel Mine, and a mark labeled "H" deep in the mountain, circled twice.', 'stove woodstove': 'Cold. Nobody has been here in days.', 'desk window': 'Neatly organized. The ranger was a tidy person.', 'rack gun': 'Empty. They took it with them.' } },
   mine: { name: 'Old Mine Tunnel', dark: 1, x: { s: 'ranger', n: 'bunker_door' },
     desc: 'A long, timber-braced tunnel descending into the mountain. Rusted rails run along the floor, and the air is cold and smells of stone. The tunnel continues north. The ranger station is south.',
     scn: { 'rails rail track': 'Rusty narrow-gauge mine rails.', 'timber beams braces': 'Black with age.' } },
   bunker_door: { name: 'Halcyon Gate', x: { s: 'mine', n: () => S.f.swiped && S.f.coded ? 'END_BUNKER' : 'The blast door is sealed.' },
     desc: 'The tunnel ends in a perfectly smooth concrete wall, in the middle of which is a massive steel blast door, three feet thick, with a green HALCYON logo. Beside it is a keypad and a card slot, both glowing patiently. The tunnel leads south.',
-    scn: { 'door blast': () => S.f.swiped && S.f.coded ? 'The door stands open. Warm light spills from inside.' : 'A gigantic blast door. It looks like it could survive anything, which is the point.', 'logo halcyon': 'A green HALCYON logo, a stylised bird. "Peace for generations," it says.' } },
+    scn: { 'door blast': () => S.f.swiped && S.f.coded ? 'The door stands open. Warm light spills from inside.' : 'A gigantic blast door. It looks like it could survive anything, which is the point.', 'logo halcyon': 'A green HALCYON logo, a stylized bird. "Peace for generations," it says.' } },
   ramp: { name: 'Route 9 On-Ramp', x: { sw: 'square', e: 'afgate' },
     desc: 'Cars are jammed bumper to bumper up the ramp, doors open, engines dead. A stranded sedan sits in the middle with its trunk open. A road sign points east to FORT MARROW AIRFIELD. The town square is southwest.',
-    scn: { 'cars car sedan': 'Abandoned. Doors open. A child\'s drawing is taped to a back window.', 'sign': 'FORT MARROW AIRFIELD - EAST. A hastily painted arrow adds "FLY OUT!"', 'trunk': 'Empty apart from a spare tyre and a lot of dust.' } },
+    scn: { 'cars car sedan': 'Abandoned. Doors open. A child\'s drawing is taped to a back window.', 'sign': 'FORT MARROW AIRFIELD - EAST. A hastily painted arrow adds "FLY OUT!"', 'trunk': 'Empty apart from a spare tire and a lot of dust.' } },
   afgate: { name: 'Fort Marrow Gate', x: { w: 'ramp', e: () => S.f.chain ? 'hangar' : 'A heavy chain with a padlock the size of your fist holds the gate shut.' },
     desc: 'A chain-link gate, topped with barbed wire, closes off the airfield. A thick chain and padlock secure it. Beyond, you can see an open hangar and a helipad. The on-ramp is west.',
     scn: { 'gate fence wire': 'Chain-link and barbed wire. The kind of gate that wants to be left alone.', 'airfield hangar helipad': 'Through the fence you see a big hangar and a helipad beyond it. Nothing moves.' } },
@@ -183,7 +190,7 @@ const items = {
     on: { switchon: () => { if (S.bat <= 0) return 'Nothing happens. It is dead.'; if (S.f.phone_on) return 'It is already on.'; S.f.phone_on = 1; return 'The screen lights up.'; }, switchoff: () => { S.f.phone_on = 0; return 'The screen goes dark. Battery saved.'; }, use: () => 'Your phone, in a cracked rose-gold case. ' + phoneScreen() } },
   charger: { n: 'a phone charger', al: 'charger cable cord charging', at: 'bedroom', lst: '', d: 'A white wall charger with a frayed cable you have been meaning to replace since 2022. It only works where there is an outlet and power.', on: { use: () => { V.plug.fn(null, null, {}); return true; } } },
   hoodie: { n: 'an oversized hoodie', al: 'hoodie sweatshirt sweater hood', at: 'bedroom', wear: 1, armor: 1, lst: 'An oversized hoodie hangs off the desk chair.',
-    d: 'Heather grey, enormous, and thick enough to count as armour. "TOUCH GRASS" is printed on one sleeve. Ironically, that is now the plan.' },
+    d: 'Heather gray, enormous, and thick enough to count as armor. "TOUCH GRASS" is printed on one sleeve. Ironically, that is now the plan.' },
   backpack: { n: 'a backpack', al: 'backpack bag pack rucksack', at: 'bedroom', lst: 'Your backpack slumps in the corner.', cont: 1, open: 1, pts: ['pack', 1], d: 'A sturdy backpack covered in enamel pins. It holds about eight things.', on: { use: () => 'Try PUT something IN the backpack.' } },
   airpods: { n: 'a pair of earbuds', al: 'airpods earbuds earphones buds headphones case', at: 'bedroom', lst: 'A pair of earbuds sits on the desk.', d: 'Your earbuds. The case is at 3%. Not much help, but noise-cancelling would be nice right now.',
     on: { wear: () => 'You pop them in. The world goes pleasantly silent, and instantly you remember that is a terrible idea right now. You take them out.' } },
@@ -193,7 +200,7 @@ const items = {
     d: 'In Mom\'s handwriting: "Kiddo - hospital called me in early, something\'s going on. Door locked, stay inside, I\'ll call. There\'s pad thai in the fridge. Don\'t forget to eat. Love you. - Mom xx"' },
   fridge: { n: 'the fridge', al: 'fridge refrigerator', at: 'kitchen', lst: '', fixed: 1, cont: 1, d: 'A stainless-steel fridge covered in magnets.' },
   drink: { n: 'an energy drink', al: 'drink energy can gnarly blue', at: 'in:fridge', eat: 'You crack it open and drink it in one go. Your heart does a drum solo. You feel capable of anything, which is the effect of 160mg of caffeine and nothing else.', heal: 1, d: 'A neon blue can of GNARLY BLUE energy. "Not recommended for anyone."' },
-  padthai: { n: 'some leftover pad thai', al: 'pad thai leftover leftovers food takeout container', at: 'in:fridge', eat: 'Cold, glorious, and strangely emotional. A little of Mom in every bite. You feel better.', heal: 1, d: 'Mom\'s pad thai, in a container labelled "EAT ME" in her handwriting.' },
+  padthai: { n: 'some leftover pad thai', al: 'pad thai leftover leftovers food takeout container', at: 'in:fridge', eat: 'Cold, glorious, and strangely emotional. A little of Mom in every bite. You feel better.', heal: 1, d: 'Mom\'s pad thai, in a container labeled "EAT ME" in her handwriting.' },
   knife: { n: 'a kitchen knife', al: 'knife kitchen blade', at: 'kitchen', lst: 'A kitchen knife is in the dish rack.', wp: { msg: 'You jab the knife into the zombie\'s skull, hard. It drops, but not before it grabs you.', risk: 1 }, d: 'A sharp chef\'s knife. Close-quarters, risky.',
     on: { tape: () => makeSpear() } },
   tv: { n: 'the TV', al: 'tv television news screen', at: 'living', lst: '', fixed: 1, d: 'A big flat-screen TV, currently off.',
@@ -201,7 +208,7 @@ const items = {
   couch: { n: 'the couch', al: 'couch sofa', at: 'living', lst: '', fixed: 1, d: 'A large, deep couch that has seen too many movie marathons. It looks heavy enough to block a door.',
     on: { use: () => barricade(), push: () => barricade(), pull: () => { if (!S.f.barricade) return 'It is already where it belongs.'; S.f.barricade = 0; return 'You drag the couch back across the floor. The front door is accessible again.'; } } },
   frontdoor: { n: 'the front door', al: 'door front', at: 'living', lst: '', fixed: 1, d: 'Your front door. The deadbolt is thrown back, and it opens south into the front yard. Locks do not mean much right now.', on: { push: () => barricade(), open: () => 'It is already unlocked. You can go south.' } },
-  bat: { n: 'a baseball bat', al: 'bat baseball aluminum club', at: 'garage', lst: 'A baseball bat leans against the wall.', pts: ['weapon', 3], wp: { msg: 'You swing the bat with everything you have. The zombie\'s head snaps sideways and it goes down. Quiet again.' }, d: 'A dented aluminium bat, bruised from many seasons of Little League. Reassuringly heavy.' },
+  bat: { n: 'a baseball bat', al: 'bat baseball aluminum club', at: 'garage', lst: 'A baseball bat leans against the wall.', pts: ['weapon', 3], wp: { msg: 'You swing the bat with everything you have. The zombie\'s head snaps sideways and it goes down. Quiet again.' }, d: 'A dented aluminum bat, bruised from many seasons of Little League. Reassuringly heavy.' },
   toolbox: { n: 'a toolbox', al: 'toolbox box tool tools', at: 'garage', lst: 'A red toolbox sits on the workbench.', fixed: 1, cont: 1, d: 'A dented red metal toolbox with a rusty latch.' },
   crowbar: { n: 'a crowbar', al: 'crowbar pry bar', at: 'in:toolbox', pts: ['crowbar', 2], wp: { msg: 'You bring the crowbar down hard on the zombie. It stops moving.' }, d: 'A heavy steel crowbar. Good for prying open things. Or skulls.', on: { use: () => { const d = ['edoor', 'rdoor'].find(vis); return d ? items[d].on.pry() : 'Nothing here needs prying. (You can also ATTACK a zombie with it.)'; } } },
   mailbox: { n: 'the mailbox', al: 'mailbox mail box', at: 'front_yard', lst: '', fixed: 1, cont: 1, d: 'A small mailbox with a flag. The flag is up.' },
@@ -213,18 +220,18 @@ const items = {
   biscuit: { n: 'Biscuit the corgi', al: 'biscuit dog corgi', at: 'nowhere', lst: 'Biscuit the corgi trots along at your heels.', always: 1, fixed: 1, d: 'A rotund corgi with the confidence of a much larger dog. His tail is a blur.',
     on: { pet: () => 'You scratch behind his ears. Biscuit exhales with his whole body.', talk: () => 'Biscuit sits and listens like you are the most interesting person alive.' } },
   water: { n: 'a bottle of water', al: 'water bottle', at: 'quik', lst: 'A bottle of water sits on the counter.', eat: 'You drink. Cold, clean, and nothing special. It tastes like survival.', d: 'A plastic bottle of spring water, cold.' },
-  chips: { n: 'a bag of chips', al: 'chips bag snack crunchos', at: 'quik', lst: 'A bag of FLAMIN\' HOT CRUNCHOS sits on a shelf.', eat: 'You crunch through them. Spicy. Your fingers are now radioactive orange. You do not regret it.', heal: 1, d: 'FLAMIN\' HOT CRUNCHOS. The bag is huge. The flavour is "mostly red".' },
+  chips: { n: 'a bag of chips', al: 'chips bag snack crunchos', at: 'quik', lst: 'A bag of FLAMIN\' HOT CRUNCHOS sits on a shelf.', eat: 'You crunch through them. Spicy. Your fingers are now radioactive orange. You do not regret it.', heal: 1, d: 'FLAMIN\' HOT CRUNCHOS. The bag is huge. The flavor is "mostly red".' },
   bank: { n: 'a power bank', al: 'power bank battery portable charger powerbank', at: 'stockroom', lst: 'A portable power bank lies on a shelf.', pts: ['bank', 2], d: () => S.f.bankUsed ? 'A drained power bank.' : 'A chunky ChargeBuddy portable battery. The little lights say it is full.',
     on: { use: () => usePower('bank') } },
   bandage: { n: 'a box of adhesive bandages', al: 'bandage bandages bandaid box adhesive', at: 'pharmacy', lst: 'A box of adhesive bandages is on the floor.', d: 'A box of adhesive bandages. Enough for one patch job.', on: { use: () => healKit('bandage', 1) } },
-  pills: { n: "Mrs. Alvarez's prescription bag", al: 'pills bag prescription alvarez medicine digoxin', at: 'pharmacy', lst: 'A paper bag on the pickup shelf is stapled shut and labelled ALVAREZ, ROSA.', pts: ['pills', 3], d: 'A white paper bag stapled shut: ALVAREZ, ROSA - DIGOXIN, 0.125MG. Heart medication, taken daily. Mrs. Alvarez from the end of the street.' },
+  pills: { n: "Mrs. Alvarez's prescription bag", al: 'pills bag prescription alvarez medicine digoxin', at: 'pharmacy', lst: 'A paper bag on the pickup shelf is stapled shut and labeled ALVAREZ, ROSA.', pts: ['pills', 3], d: 'A white paper bag stapled shut: ALVAREZ, ROSA - DIGOXIN, 0.125MG. Heart medication, taken daily. Mrs. Alvarez from the end of the street.' },
   hammer: { n: 'a claw hammer', al: 'hammer claw', at: 'hardware', lst: 'A claw hammer hangs on the pegboard.', pts: ['weapon', 3], wp: { msg: 'You bring the hammer down on the zombie. It stops moving.' }, d: 'A solid claw hammer. Better than nothing.' },
   cutters: { n: 'a pair of bolt cutters', al: 'bolt cutters boltcutters cutters', at: 'hardware', lst: 'A pair of bolt cutters hangs on the pegboard.', pts: ['cutters', 2], d: 'Heavy-duty bolt cutters with red rubber handles. For when a padlock stands between you and the future.', on: { use: () => vis('chain') ? items.chain.on.cut() : 'There is nothing here to cut.' } },
   latte: { n: 'a cold oat latte', al: 'latte coffee oat cup', at: 'cafe', lst: 'A cold oat latte sits on a table.', eat: 'Lukewarm, over-sweet, and absolutely worth it. A small win in a bad week.', d: 'An oat milk latte, half-finished, with heart latte art long gone.' },
   nightstick: { n: 'a nightstick', al: 'nightstick baton club', at: 'police', lst: 'A nightstick lies on the front desk.', pts: ['weapon', 3], wp: { msg: 'You crack the nightstick across the zombie\'s skull. It drops.' }, d: 'A standard-issue police baton. Solid, and comforting to hold.' },
   flaregun: { n: 'a flare gun', al: 'flare gun flaregun signal', at: 'evidence', lst: 'A bright orange flare gun sits in an evidence bag tagged "EXHIBIT 14B: SPRING BREAK, PIER 9".', pts: ['flare', 4], d: 'A bright orange flare gun, already loaded. Evidence tag: "Exhibit 14B". It will definitely be used for evidence, in a sense.',
     on: { fire: () => fireFlare(), use: () => fireFlare() } },
-  locker: { n: "your mom's locker", al: 'locker mom moms mothers', at: 'staff', lst: '', fixed: 1, cont: 1, d: 'A grey metal locker with "MOM (M. TORRES, RN)" on a label, and a sticker of you at age six, missing a front tooth.' },
+  locker: { n: "your mom's locker", al: 'locker mom moms mothers', at: 'staff', lst: '', fixed: 1, cont: 1, d: 'A gray metal locker with "MOM (M. TORRES, RN)" on a label, and a sticker of you at age six, missing a front tooth.' },
   momnote: { n: "Mom's note", al: 'note mom moms letter paper', at: 'in:locker', read: 1, pts: ['mom', 6],
     d: 'On a torn piece of chart paper, in her handwriting: "Kiddo - they are evacuating staff and families to Pier 9. A boat to Haven Island. I\'m going with the convoy. Find me there. My phone is dead because I forgot my charger, as always. I love you. Eat something. - Mom." There is a lipstick kiss in the corner.' },
   speaker: { n: 'a Bluetooth speaker', al: 'speaker bluetooth boombox boomblast', at: 'electronics', lst: 'A BoomBlast Bluetooth speaker sits on the demo table, fully charged.', pts: ['speaker', 2],
@@ -394,7 +401,7 @@ function fireFlare() {
 }
 
 // ---------------------------------------------------------------- ENDINGS
-const rank = s => s >= 100 ? 'Certified Apex Survivor' : s >= 85 ? 'Main Character' : s >= 65 ? 'Final Girl (or Boy)' : s >= 45 ? 'Survivor' : s >= 25 ? 'Side Character' : s >= 10 ? 'NPC' : 'Chronically Online';
+const rank = s => s >= 100 ? 'GOATED' : s >= 85 ? 'Main Character' : s >= 65 ? 'Locked In' : s >= 45 ? 'Mid' : s >= 25 ? 'Background Character' : s >= 10 ? 'NPC' : 'Cooked';
 const ENDINGS = {
   END_DOCK: () => 'You walk up the gangway, past a deckhand who does not look up from his list. "Name?" "...Present." He nods and ticks you off. The ferry\'s engines shudder. As Pier 9 slides away, you watch Millbrook shrink behind you: a thin column of smoke, a sky full of gulls, and a town that used to be home.\n\nBy afternoon, a green line appears on the horizon: HAVEN ISLAND. White dunes, a lighthouse, solar arrays, and kids running on real grass. A volunteer hands you a blanket and a hot meal.' +
     (S.f.s_mom ? '\n\nAt the rail, a woman in scrubs turns around. "...Kiddo?" She crosses the deck in four strides and hugs you so hard your ribs creak. "You ate something, didn\'t you?" "Yeah, Mom. I ate something."' : '\n\nYou search the faces on the deck for Mom. She is not there. You tell yourself she took an earlier boat. You keep telling yourself that.') +
@@ -403,7 +410,7 @@ const ENDINGS = {
   END_BUNKER: () => 'You step through, and the blast door seals behind you with a sound like the world closing a book. A corridor of soft white light leads downward. A voice, kind and pre-recorded: "Welcome to Halcyon. You are Resident 4,112."\n\nYou walk through hydroponic gardens under purple grow lamps, a cafeteria, a library, bunk pods, and a wall-sized screen looping a sunrise. A volunteer hands you a mug of something hot. "Wi-Fi\'s halcyon_guest," she says. "No password. One bar."\n\nIt is the safest place on Earth. You are going to be here a very long time.' +
     (S.f.dog ? '\n\nBiscuit, for his part, finds the hydroponic lettuce. He is thrilled.' : '') +
     '\n\n      *** YOU HAVE REACHED BUNKER HALCYON ***',
-  END_AIR: () => 'You fire the flare. It screams skyward and blossoms into a hanging red star. For a long minute nothing happens. Then, a thud, then a rhythm, and over the treeline a helicopter swings in low, its rotor wash flattening the grass.\n\nThe loadmaster hauls you aboard by the back of your hoodie. "Where to, passenger?" he yells. "Anywhere with a door that locks!" He grins. "We\'ve got a carrier."\n\nBelow, Fort Marrow and Millbrook fall away. On the horizon, a line of grey ships. Someone hands you a blanket and a cup of terrible coffee. It is the best thing you have ever tasted.' +
+  END_AIR: () => 'You fire the flare. It screams skyward and blossoms into a hanging red star. For a long minute nothing happens. Then, a thud, then a rhythm, and over the treeline a helicopter swings in low, its rotor wash flattening the grass.\n\nThe loadmaster hauls you aboard by the back of your hoodie. "Where to, passenger?" he yells. "Anywhere with a door that locks!" He grins. "We\'ve got a carrier."\n\nBelow, Fort Marrow and Millbrook fall away. On the horizon, a line of gray ships. Someone hands you a blanket and a cup of terrible coffee. It is the best thing you have ever tasted.' +
     (S.f.dog ? '\n\nBiscuit rides with his head out the window, ears streaming. He has never been happier.' : '') +
     '\n\n      *** YOU HAVE BEEN EVACUATED ***'
 };
@@ -415,7 +422,7 @@ function win(k) {
   return '';
 }
 function die(why) {
-  say(`\n${why}\nYour vision narrows. The world goes quiet. When you wake up, you are hungry, and you cannot remember why that is a problem.\n\n   ****  You have joined the walking dead  ****\n\nYour score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\n\nWould you like to RESTART, RESTORE a saved game, or QUIT?`, 'danger');
+  say(`\n${why}\nYour vision narrows. The world goes quiet. When you wake up, you are hungry, and you cannot remember why that is a problem.\n\n   ****  You're cooked. You have joined the walking dead.  ****\n\nYour score is ${S.score} (out of ${MAX}), in ${S.moves} moves.\nThis gives you the rank of ${rank(S.score)}.\n\nWould you like to RESTART, RESTORE a saved game, or QUIT?`, 'danger');
   S.over = 'dead';
 }
 
@@ -589,7 +596,7 @@ def('inventory i inv', () => {
 def('examine x inspect check', (a, b, P) => {
   if (!P.n1) return describe(true);
   if (a.scn) return say(a.scn);
-  if (a.zombie) return say('Grey, glassy-eyed, and walking like it has lost something important. It does not blink.');
+  if (a.zombie) return say('Gray, glassy-eyed, and walking like it has lost something important. It does not blink.');
   say(val(a.d), a.id === 'phone' ? 'phone' : '');
   if (a.cont && isOpen(a.id)) { const c = ids('in:' + a.id); say(c.length ? `It contains: ${c.map(i => items[i].n).join(', ')}.` : 'It is empty.'); }
 });
@@ -643,7 +650,7 @@ def('close shut', (a, b, P) => { if (!a || !a.cont) return say("You can't close 
 def('search', (a, b, P) => {
   if (!a) return say('Search what?');
   if (a.cont) { if (!isOpen(a.id)) return say("It's closed."); const c = ids('in:' + a.id); return say(c.length ? `It contains: ${c.map(i => items[i].n).join(', ')}.` : 'It is empty.'); }
-  say('You find nothing of interest.');
+  say('Nothing. Genuinely nothing.');
 });
 def('read', (a, b, P) => { if (!a) return say('Read what?'); if (a.scn) return say(a.scn); if (a.read) { say(val(a.d)); if (a.pts) aw(a.pts[0], a.pts[1]); return; } say('There is nothing to read there.'); });
 def('wear', (a, b, P) => {
@@ -682,7 +689,7 @@ def('listen', (a, b, P) => {
   const n = Object.values(S.z).reduce((s, x) => s + x, 0);
   say(S.moves < 12 ? 'Quiet. A distant dog barks. A car alarm somewhere.' : S.z[S.room] > 0 ? 'Moaning, loud and close.' : n > 8 ? 'Distant screaming and a lot of low, wet moaning.' : 'Sirens in the distance, and far-off groaning.');
 });
-def('wait z', () => say('Time passes.'));
+def('wait z', () => say('You wait. Nothing. Not even a notification.'));
 def('attack kill hit fight stab swing punch', (a, b, P) => {
   if (!a) return say('Attack what?');
   if (!a.zombie) return say(a.id === 'biscuit' ? 'You monster. Biscuit looks at you with betrayal.' : "Violence isn't the answer to this one.");
@@ -746,8 +753,8 @@ def('go walk run', (a, b, P) => {
 def('climb', (a, b, P) => say('There is nothing to climb here.'));
 def('out', () => go('out'), 1);
 def('hide', () => say('You crouch behind whatever is nearby. It is not enough, but it feels better.'));
-def('jump', () => say('Wheeee. Nothing happens.'));
-def('sleep', () => say('You are far too wired to sleep.'));
+def('jump', () => say('You jump. Main character energy, zero effect.'));
+def('sleep', () => say('Sleep is for people who aren\'t being hunted.'));
 def('dance', () => say('You dance. It is cringe. Even the zombies are embarrassed for you.'));
 def('scream yell shout', () => say(S.z[S.room] > 0 ? 'You scream. The zombie does not even flinch. That was a mistake.' : 'You scream. Somewhere far off, something screams back. That was a mistake.'));
 def('xyzzy plugh', () => say('A hollow voice says "Fool." This is not that kind of game.'));

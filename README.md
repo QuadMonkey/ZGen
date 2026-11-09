@@ -26,7 +26,7 @@ survive the morning, find your way across a town that is falling apart, and get 
 2. **Bunker Halcyon**, a huge underground shelter in the Mount Kestrel mountains, stocked for years.
 3. **Fort Marrow Airfield**, a helicopter extraction to the fleet offshore.
 
-The game runs in your browser inside a 1980s-style colour monitor drawn entirely in CSS: scanlines, glass glare,
+The game runs in your browser inside a 1980s-style color monitor drawn entirely in CSS: scanlines, glass glare,
 a fake "loading" boot sequence, and a 40-column pixel font.
 
 ## Play
@@ -78,9 +78,9 @@ off limits, and the game will tell you when it does not understand.
 | Tools | `pry <x> with <y>`, `cut <x> with <y>`, `unlock <x> with <y>`, `push <x>`, `throw <x> <direction>`, `tape <x>` |
 | Game | `inventory` (or `i`), `score`, `diagnose`, `hint`, `save`, `restore`, `restart`, `quit`, `verbose`, `brief`, `again` (or `g`) |
 
-The text is colour-coded: room names in yellow, things you can pick up in cyan, people speaking in green, your phone in mint, the
+The text is color-coded: room names in yellow, things you can pick up in cyan, people speaking in green, your phone in mint, the
 world moving on in pink, danger as white on a red bar, and routine replies such as "Taken." in a quiet blue. Your own commands are
-amber. Type `colour` to switch the colours off (and on again) if you prefer plain text.
+amber. Type `color` to switch the colors off (and on again) if you prefer plain text.
 
 ### Saving and loading
 
@@ -174,13 +174,13 @@ helping people, and 20 points for reaching an escape. Type `score` any time.
 
 | Score | Rank |
 | --- | --- |
-| 100 or more | Certified Apex Survivor |
+| 100 or more | GOATED |
 | 85 to 99 | Main Character |
-| 65 to 84 | Final Girl (or Boy) |
-| 45 to 64 | Survivor |
-| 25 to 44 | Side Character |
+| 65 to 84 | Locked In |
+| 45 to 64 | Mid |
+| 25 to 44 | Background Character |
 | 10 to 24 | NPC |
-| 0 to 9 | Chronically Online |
+| 0 to 9 | Cooked |
 
 A full 125 is possible, but it means doing almost everything in Millbrook before you leave, and that includes
 helping people along the way and doing a few things before the power goes out.

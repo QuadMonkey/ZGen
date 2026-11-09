@@ -161,3 +161,44 @@ console.log('throw-from-backpack ok');
   delete global.localStorage;
   console.log('save info ok');
 }
+
+// -- the rank ladder uses current Gen Z slang, and every boundary lands on the right rung
+{
+  const expect = [[0, 'Cooked'], [9, 'Cooked'], [10, 'NPC'], [24, 'NPC'], [25, 'Background Character'], [44, 'Background Character'], [45, 'Mid'], [64, 'Mid'], [65, 'Locked In'], [84, 'Locked In'], [85, 'Main Character'], [99, 'Main Character'], [100, 'GOATED'], [125, 'GOATED']];
+  g.start();
+  for (const [score, rank] of expect) { g.S.score = score; assert(g.run('score').includes('rank of ' + rank + '.'), `score ${score} should be "${rank}"`); }
+  console.log('rank ladder ok');
+}
+
+// -- voice: American spelling, the five flavor lines, and a phone that fills up as the morning goes on
+{
+  const fs = require('fs');
+  // no British spellings in player-facing text. Skipped on purpose: the vest alias and the pond noun (the parser accepts both spellings).
+  const bad = /\b(armour|aluminium|tyres?|colours?|flavour|labelled|organised|stylised|cosy|grey|trolley)\b/i;
+  const offenders = fs.readFileSync(__dirname + '/game.js', 'utf8').split('\n').map((l, i) => [i + 1, l]).filter(([, l]) => bad.test(l) && !l.includes("al: 'vest") && !l.includes("'trolley cart'"));
+  assert.deepStrictEqual(offenders.map(o => o[0]), [], 'British spelling on game.js line(s) ' + offenders.map(o => o[0]));
+  // typing either spelling still works for the two parser nouns
+  g.start(); g.S.room = 'hangar'; assert(!g.run('examine vest').includes("can't see"), 'vest');
+  g.S.room = 'pond'; assert(!g.run('examine trolley').includes("can't see") && !g.run('examine cart').includes("can't see"), 'trolley and cart both work');
+
+  g.start(); g.S.at.phone = 'inv'; g.S.f.phone_on = 1;
+  assert(g.run('wait').includes('Not even a notification') && g.chunks()[0][1] === 'dim', 'wait is still a quiet routine line');
+  assert(g.run('jump').includes('Main character energy'), 'jump');
+  assert(g.run('sleep').includes("aren't being hunted"), 'sleep');
+  g.S.room = 'kitchen'; assert(g.run('search sink').includes('Genuinely nothing'), 'search');
+  g.S.hp = 1; g.S.zt = 5; g.S.room = 'hospital'; g.S.z.hospital = 2; assert(g.run('wait').includes("You're cooked. You have joined the walking dead."), 'death headline');
+
+  // the phone: later moves add messages, nothing disappears, and no message is timestamped after the phone's own clock
+  const phone = moves => { g.start(); g.S.at.phone = 'inv'; g.S.f.phone_on = 1; g.S.bat = 90; g.S.moves = moves; return g.run('examine phone'); };
+  const has = (t, s) => assert(t.includes(s), `phone at move ${moves_} should show "${s}"`);
+  let moves_ = 0; let t = phone(moves_); has(t, 'completely cooked'); assert(!t.includes('mailman'), 'move 0: only the first text');
+  moves_ = 12; t = phone(moves_); has(t, 'completely cooked'); has(t, 'mailman'); has(t, 'why is everyone walking');
+  moves_ = 35; t = phone(moves_); has(t, 'mailman'); has(t, "uncles garage"); has(t, '212 unread'); assert(!t.includes('wifi'), 'not yet');
+  moves_ = 50; t = phone(moves_); has(t, 'uncles garage'); has(t, 'wifi down'); has(t, '[Not Delivered]'); assert(!t.includes('almost an hour'), 'not yet');
+  moves_ = 75; t = phone(moves_); has(t, 'wifi down'); has(t, 'almost an hour');
+  for (const m of [0, 10, 30, 45, 70, 120]) {
+    const clock = 400 + m * 2, txt = phone(m);
+    for (const [, h, mm] of txt.matchAll(/\((\d+):(\d\d) AM\)/g)) if (!(+h === 5)) assert(+h * 60 + +mm <= clock, `move ${m}: a text is stamped ${h}:${mm}, after the phone clock`);
+  }
+  console.log('voice and phone texts ok');
+}

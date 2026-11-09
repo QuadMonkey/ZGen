@@ -316,7 +316,7 @@
     else if (colour) {
       mono = colour[1] ? colour[1] === 'off' : !mono; document.body.classList.toggle('mono', mono);
       try { localStorage.setItem('zgen-mono', mono ? '1' : '0'); } catch (e) {}
-      const msg = mono ? 'Colour is off. Type COLOUR to turn it back on.' : 'Colour is on. Type COLOUR to turn it off.';
+      const msg = mono ? 'Color is off. Type COLOR to turn it back on.' : 'Color is on. Type COLOR to turn it off.';
       await typeChunks([[msg, 'dim'], ['\n', '']]); announce(msg);
     } else {
       const out = run(v), pieces = chunks(); refresh();
