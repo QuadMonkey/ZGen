@@ -175,6 +175,8 @@ helping people along the way and doing a few things before the power goes out.
   are below.
 - `index.html`: the monitor, the screen effects, the boot sequence and the phone layout. Add `?mobile` to the address
   to force the phone layout on a desktop browser.
+- When you change `game.js` in a way `index.html` depends on, bump the `?v=` number on the `game.js` script tag in
+  `index.html`. Browsers cache files for a few minutes, and the number makes sure a new page never runs an old engine.
 - `test.js`: run `node test.js` to replay all three endings, the side quests, and a perfect 125-point run.
 
 ## Licence

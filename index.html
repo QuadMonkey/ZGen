@@ -93,6 +93,7 @@
     font: 16px/32px 'PS2P', monospace; color: #8a8a8a; }
   #off > div { animation: blink 1.6s steps(1) infinite; }
   #off small { font-size: 8px; color: #5a5a5a; }
+  #skiphint { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 8px 'PS2P', monospace; color: #8fb6e8; pointer-events: none; }
   #foot { width: 780px; height: 16px; margin: 0 auto; border-radius: 0 0 14px 14px; background: linear-gradient(#b8b19e, #8f8878); box-shadow: 0 14px 24px rgba(0,0,0,.7); }
 
   /* ================= PHONE MODE: no cabinet, the CRT picture fills the screen ================= */
@@ -137,6 +138,7 @@
         </div>
       </div>
       <div id="off"><div id="offtext">CLICK OR PRESS ANY KEY<br>TO POWER ON<br><small id="fsnote">(GOES FULL SCREEN)</small></div></div>
+      <div id="skiphint" aria-hidden="true"></div>
       <div id="scan" class="fx" aria-hidden="true"></div><div id="roll" class="fx" aria-hidden="true"></div><div id="vig" class="fx" aria-hidden="true"></div><div id="glare" class="fx" aria-hidden="true"></div>
     </div></div></div>
     <div id="chin">
@@ -148,12 +150,18 @@
   <div id="foot"></div>
 </div>
 
-<script src="game.js"></script>
+<script src="game.js?v=3"></script>
 <script>
   const $ = id => document.getElementById(id);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const frame = () => new Promise(r => requestAnimationFrame(r));
   const log = $('log'), row = $('row'), cmd = $('cmd'), scroll = $('scroll'), typed = $('typed'), glass = $('glass'), stage = $('stage'), sr = $('sr'), pad = $('pad'), strip = $('strip');
+  function showError(msg) { // a phone has no developer console, so show problems on screen
+    try { const m = document.createElement('div'); m.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99;background:#5a0a0a;color:#fff;font:12px/1.4 monospace;padding:8px;white-space:pre-wrap';
+      m.textContent = 'ZGEN hit a problem: ' + msg + '\n(Try reloading the page. If it keeps happening, tell the developer this message.)'; document.body.append(m); } catch (e) {}
+  }
+  addEventListener('error', e => showError(e.message));
+  addEventListener('unhandledrejection', e => showError((e.reason && e.reason.message) || e.reason));
   const hist = []; let hi = 0, skip = false, busy = true, powered = false, wasOn = false;
 
   // ---- phone or desktop? Decided from the device, and re-decided only when the window WIDTH changes
@@ -179,10 +187,11 @@
   function applyMode() {
     document.body.classList.toggle('mobile', mobile);
     document.documentElement.style.setProperty('--fs', SIZES[sizeIx] + 'px');
-    if (mobile) { $('offtext').firstChild.textContent = 'TAP THE SCREEN'; layout(); }
-    else { stage.style.top = ''; stage.style.height = ''; $('offtext').firstChild.textContent = 'CLICK OR PRESS ANY KEY'; fit(); }
+    const ot = $('offtext'), fn = $('fsnote'); // both are gone once the monitor is on
+    if (mobile) { if (ot) ot.firstChild.textContent = 'TAP THE SCREEN'; layout(); }
+    else { stage.style.top = ''; stage.style.height = ''; if (ot) ot.firstChild.textContent = 'CLICK OR PRESS ANY KEY'; fit(); }
     const d = document.documentElement;
-    if (!(d.requestFullscreen || d.webkitRequestFullscreen)) $('fsnote').style.display = 'none'; // e.g. iPhone has no full screen
+    if (fn && !(d.requestFullscreen || d.webkitRequestFullscreen)) fn.style.display = 'none'; // e.g. iPhone has no full screen
   }
   addEventListener('resize', () => { if (innerWidth !== lastW) { lastW = innerWidth; baseH = 0; mobile = isPhone(); applyMode(); } else if (mobile) layout(); });
   addEventListener('orientationchange', () => { baseH = 0; setTimeout(layout, 300); });
@@ -207,6 +216,11 @@
   }
 
   async function boot(intro) {
+    try { await bootSequence(intro); }
+    catch (e) { showError(e.message); log.append('\n' + intro + '\n\n'); }
+    finally { $('skiphint').remove(); skip = false; busy = false; row.style.display = 'block'; pad.classList.add('on'); end(); if (!mobile) cmd.focus(); }
+  }
+  async function bootSequence(intro) {
     $('crt').classList.add('on'); await sleep(750);
     if (!skip) {
       await typeOut('**** GAMMOLORE 64 BASIC V2 ****\n\n64K RAM SYSTEM  38911 BASIC BYTES FREE\n\nREADY.\n', 3, 14);
@@ -222,12 +236,10 @@
     if (!skip) logo.className = 'reveal';
     log.append(logo);
     $('status').style.display = 'flex'; refresh();
-    if (!skip) { loadingBorder(1300); await sleep(2600); await wait(1200); }
+    if (!skip) { loadingBorder(1300); await sleep(2600); await wait(600); }
     let resume = false; try { resume = !!localStorage.getItem('zgen-auto'); } catch (e) {}
     const text = intro + (resume ? '\n\n(An autosaved game was found. Type CONTINUE to resume it.)' : '');
-    await typeOut(text + '\n\n'); announce(text);
-    skip = false; busy = false; row.style.display = 'block'; pad.classList.add('on'); updatePad(); end();
-    if (!mobile) cmd.focus(); // on a phone the keyboard waits until you ask for it
+    await typeOut(text + '\n\n'); announce(text); updatePad(); // (on a phone the keyboard waits until you ask for it)
   }
 
   async function submit(v) {
@@ -285,7 +297,7 @@
     for (const v of VERBS) { const b = chip(v[0], null); b.addEventListener('click', () => verbTap(v, b)); $('verbs').append(b); }
   }
   function updatePad() {
-    if (!mobile) return;
+    if (!mobile || typeof context !== 'function') return;
     const ex = new Set(context().exits.map(e => e.dir));
     for (const b of document.querySelectorAll('#dpad [data-dir]')) b.classList.toggle('off', !ex.has(b.dataset.dir));
   }
@@ -310,6 +322,8 @@
     $('off').remove(); $('crt').style.visibility = 'visible'; $('led').classList.remove('dim');
     if (location.search.includes('skip')) skip = true; // ?skip jumps past the boot sequence (and stays windowed)
     else { const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; try { const p = f && f.call(d); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    $('skiphint').textContent = skip ? '' : (mobile ? 'TAP TO SKIP' : 'PRESS ANY KEY TO SKIP');
+    setTimeout(() => { if (busy) skip = true; }, 30000); // a stalled boot must always finish
     boot(start());
   }
   applyMode();
