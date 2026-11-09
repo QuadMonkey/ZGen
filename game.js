@@ -452,6 +452,7 @@ function go(dir) {
   S.room = t; S.zt = 0;
   if (S.f.dog) S.at.biscuit = t;
   describe(false);
+  if (!S.over) tick(); // a failed move costs no turn
 }
 function bite(who) {
   const w = ids('worn').find(i => S.f['a_' + i] > 0);
@@ -556,7 +557,7 @@ function run(raw) {
   for (const [re, rep] of PH) t = t.replace(re, rep);
   if (t === 'again') { if (!S.last) { say('Again what?'); return flush(); } t = S.last; } else S.last = t;
   const w = t.split(' '), verb = w[0], rest = w.slice(1);
-  if (DIR[verb] && !rest.length) { go(DIR[verb]); if (!S.over) tick(); return flush(); }
+  if (DIR[verb] && !rest.length) { go(DIR[verb]); return flush(); }
   const v = V[verb];
   if (!v) { say(`I don't know the word "${verb}".`); return flush(); }
   let pi = rest.findIndex((x, i) => i > 0 && PREP.has(x));
@@ -735,15 +736,15 @@ def('enter board', (a, b, P) => {
   if (!P.n1) return say('Enter what?');
   if (a && a.go) return a.go.startsWith('END_') ? win(a.go) : go(a.go);
   say("You can't get in there.");
-});
+}, 1);
 def('go walk run', (a, b, P) => {
   const d = DIR[P.n1];
   if (d) return go(d);
   if (!P.n1) return say('Go where?');
   say("Which direction? (Try N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT.)");
-});
+}, 1);
 def('climb', (a, b, P) => say('There is nothing to climb here.'));
-def('out', () => go('out'));
+def('out', () => go('out'), 1);
 def('hide', () => say('You crouch behind whatever is nearby. It is not enough, but it feels better.'));
 def('jump', () => say('Wheeee. Nothing happens.'));
 def('sleep', () => say('You are far too wired to sleep.'));
